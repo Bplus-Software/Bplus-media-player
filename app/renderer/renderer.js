@@ -494,21 +494,15 @@ function startViz(style) {
       }
       g2.globalAlpha = 1;
     } else if (style === 'ripple') {
-      // B+ identity: dotted LED rings around the B+ mark - same round dots,
-      // same accent, same lit/dim language as the bars and dots styles.
+      // Clean concentric rings expanding with the music around the B+ mark.
       const cx = W / 2, cy = mid;
       const maxR = Math.min(W, H) * 0.42;
-      const rD = Math.min(3.4 * dpr, maxR * 0.028);
       for (let i = 0; i < N; i++) {
         const base = maxR * (0.30 + 0.70 * i / (N - 1));
-        const r = base * (1 + sm[i] * 0.08); // ring breathes with its band
-        const dots = Math.max(10, Math.round((2 * Math.PI * base) / (rD * 3.4)));
-        const phase = (i % 2) * Math.PI / dots;
-        g2.globalAlpha = fade * (0.18 + 0.72 * Math.min(1, sm[i] * 1.3));
-        for (let d = 0; d < dots; d++) {
-          const a = phase + d * 2 * Math.PI / dots;
-          g2.beginPath(); g2.arc(cx + r * Math.cos(a), cy + r * Math.sin(a), rD, 0, 7); g2.fill();
-        }
+        const r = base * (1 + sm[i] * 0.16); // ring expands with its band
+        g2.globalAlpha = fade * (0.22 + 0.68 * Math.min(1, sm[i] * 1.3));
+        g2.lineWidth = (2.8 - 1.2 * i / (N - 1)) * dpr;
+        g2.beginPath(); g2.arc(cx, cy, r, 0, 7); g2.stroke();
       }
       // B+ mark at the centre, pulsing gently with the overall level
       let lvl = 0; for (let i = 0; i < N; i++) lvl += sm[i]; lvl /= N;
