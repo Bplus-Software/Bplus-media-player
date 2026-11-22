@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('bplus', {
   updateDownload:(info)=>ipcRenderer.invoke('update:download',info),
   updateInstall:(p)=>ipcRenderer.invoke('update:install',p),
   updatePrompt:(info)=>ipcRenderer.invoke('update:prompt',info),
+  updateOpenPage:()=>ipcRenderer.invoke('update:open-page'),
   onUpdateProgress:(cb)=>ipcRenderer.on('update:progress',(e,p)=>cb(p)),
   systemTheme:()=>ipcRenderer.invoke('system:theme'),
   onTheme:cb=>ipcRenderer.on('theme:changed',(e,theme)=>cb(theme)),

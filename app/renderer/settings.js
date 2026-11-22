@@ -102,7 +102,8 @@
      content.append(dlBtn);}
     else if(r&&r.status==='latest')status.textContent=(en?'You are on the latest version (B+ ':'أنت على أحدث إصدار (B+ ')+r.version+').';
     else if(r&&r.status==='none')status.textContent=en?'No updates published yet. You are on the latest version.':'لا توجد تحديثات منشورة بعد. أنت على أحدث إصدار.';
-    else status.textContent=en?'Could not check for updates. Check your internet connection.':'تعذر التحقق من التحديثات. تحقق من اتصال الإنترنت.';};
+    else{status.textContent=(en?'Could not check for updates. ':'تعذر التحقق من التحديثات. ')+(r&&r.message?String(r.message)+' — ':'')+(en?'Check your internet connection.':'تحقق من اتصال الإنترنت.');
+     let pg=document.createElement('button');pg.className='settings-action';pg.textContent=en?'Open releases page':'فتح صفحة التحديثات';pg.onclick=()=>window.bplus.updateOpenPage();content.append(pg);}};
    content.append(cur,checkBtn,status,prog);
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }

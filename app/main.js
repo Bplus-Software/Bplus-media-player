@@ -39,12 +39,29 @@ ipcMain.on('ui:language',(e,l)=>{uiLang=l==='en'?'en':'ar';});
 const UPD_REPO='basem-sadoun/Bplus';
 function cmpVer(a,b){const p=s=>String(s||'').replace(/^v/i,'').split('.').map(n=>parseInt(n,10)||0);const x=p(a),y=p(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]-y[i]}return 0}
 async function fetchLatestRelease(){
- const r=await require('electron').net.fetch('https://api.github.com/repos/'+UPD_REPO+'/releases/latest',{headers:{'User-Agent':'Bplus-Player'}});
- if(r.status===404)return{status:'none'};
- if(!r.ok)return{status:'error',code:r.status};
- const j=await r.json();
- const asset=(j.assets||[]).find(a=>/\.exe$/i.test(a.name));
- return{status:'ok',version:String(j.tag_name||'').replace(/^v/i,''),name:j.name||'',notes:j.body||'',asset:asset?{name:asset.name,url:asset.browser_download_url,size:asset.size}:null};
+ const ua={'User-Agent':'Bplus-Player'};
+ const nf=()=>require('electron').net.fetch;
+ // Primary: GitHub API
+ try{
+  const r=await nf()('https://api.github.com/repos/'+UPD_REPO+'/releases/latest',{headers:ua});
+  if(r.status===404)return{status:'none'};
+  if(r.ok){
+   const j=await r.json();
+   const asset=(j.assets||[]).find(a=>/\.exe$/i.test(a.name));
+   return{status:'ok',version:String(j.tag_name||'').replace(/^v/i,''),name:j.name||'',notes:j.body||'',asset:asset?{name:asset.name,url:asset.browser_download_url,size:asset.size}:null};
+  }
+  var lastErr='GitHub API: HTTP '+r.status;
+ }catch(e){var lastErr='GitHub API: '+String(e&&e.message||e)}
+ // Fallback: github.com/releases/latest redirects to the tag page - works even if api.github.com is filtered
+ try{
+  const r2=await nf()('https://github.com/'+UPD_REPO+'/releases/latest',{headers:ua,redirect:'manual'});
+  const loc=r2.headers.get('location')||r2.url||'';
+  const m=/\/releases\/(?:tag|download)\/(v?[^\s/?#]+)/i.exec(loc);
+  if(m){const ver=m[1].replace(/^v/i,'');
+   return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+m[1]+'/Bplus-'+ver+'-Setup.exe',size:0}};}
+  lastErr+=' | github.com: HTTP '+r2.status;
+ }catch(e){lastErr+=' | github.com: '+String(e&&e.message||e)}
+ return{status:'error',message:lastErr};
 }
 ipcMain.handle('update:check',async()=>{
  try{
@@ -73,6 +90,7 @@ async function downloadUpdate(info){
  }catch(err){updDownloading=false;return{status:'error',message:String(err&&err.message||err)}}
 }
 ipcMain.handle('update:download',async(e,info)=>downloadUpdate(info));
+ipcMain.handle('update:open-page',()=>shell.openExternal('https://github.com/'+UPD_REPO+'/releases/latest'));
 ipcMain.handle('update:install',async(e,setupPath)=>{
  try{const{spawn}=require('child_process');const c=spawn(setupPath,[],{detached:true,stdio:'ignore'});c.unref();app.quit();return true}catch(err){return false}
 });
