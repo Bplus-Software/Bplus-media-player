@@ -29,6 +29,7 @@ const menuPop = $('menu-pop');
 const bigPlay = $('big-play');
 
 let playlist = [];
+let plSel = -1;
 let current = -1;
 let seeking = false;
 let subTrackUrl = null;
@@ -57,17 +58,34 @@ function renderPlaylist() {
   playlist.forEach((item, i) => {
     const li = document.createElement('li');
     if (i === current) li.classList.add('playing');
+    if (i === plSel) li.classList.add('sel');
     const idx = document.createElement('span');
     idx.className = 'idx'; idx.textContent = i + 1;
     const nm = document.createElement('span');
-    nm.className = 'nm'; nm.textContent = item.name; nm.title = item.name;
+    nm.className = 'nm'; nm.dir = 'auto'; nm.textContent = item.name; nm.title = item.name;
+    const up = document.createElement('button');
+    up.className = 'mv'; up.title = L('تحريك لأعلى', 'Move up'); up.innerHTML = '<svg data-ic="caret-up"></svg>';
+    up.onclick = (ev) => { ev.stopPropagation(); moveItem(i, -1); };
+    const dn = document.createElement('button');
+    dn.className = 'mv'; dn.title = L('تحريك لأسفل', 'Move down'); dn.innerHTML = '<svg data-ic="caret-down"></svg>';
+    dn.onclick = (ev) => { ev.stopPropagation(); moveItem(i, 1); };
     const rm = document.createElement('button');
-    rm.className = 'rm'; rm.textContent = '✕'; rm.title = L('إزالة', 'Remove');
+    rm.className = 'rm'; rm.textContent = '✕'; rm.title = L('إزالة من القائمة', 'Remove from list');
     rm.onclick = (ev) => { ev.stopPropagation(); removeAt(i); };
-    li.append(idx, nm, rm);
-    li.onclick = () => playAt(i);
+    li.append(idx, nm, up, dn, rm);
+    li.onclick = () => { plSel = i; playAt(i); };
+    li.oncontextmenu = (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); plSel = i; renderPlaylist();
+      showPop(ctxMenu, { getBoundingClientRect: () => ({ left: ev.clientX, right: ev.clientX, top: ev.clientY, bottom: ev.clientY }) }, (c) => {
+        popItem(c, L('تشغيل', 'Play'), null, () => playAt(i));
+        popItem(c, L('إزالة من القائمة', 'Remove from list'), 'Del', () => removeAt(i));
+        popSep(c);
+        popItem(c, L('حذف الملف (سلة المحذوفات)', 'Delete file (Recycle Bin)'), 'Shift+Del', () => trashAt(i));
+      });
+    };
     plList.appendChild(li);
   });
+  BPLUS_ICONS.hydrate(plList);
 }
 
 /* Same-format sibling expansion (Settings > Playback). */
@@ -104,6 +122,40 @@ function removeAt(i) {
   playlist.splice(i, 1);
   if (i === current) { activeResumeKey=null;current = -1; player.removeAttribute('src'); player.load(); setPlayingUI(false); titleLabel.textContent = ''; tbTitle.textContent = ''; }
   else if (i < current) current--;
+  if (plSel === i) plSel = -1; else if (plSel > i) plSel--;
+  renderPlaylist();
+}
+function moveItem(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= playlist.length) return;
+  [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+  if (current === i) current = j; else if (current === j) current = i;
+  if (plSel === i) plSel = j; else if (plSel === j) plSel = i;
+  renderPlaylist();
+}
+async function trashAt(i) {
+  const item = playlist[i]; if (!item) return;
+  const en = window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.prefs.language === 'en';
+  hidePops();
+  const r = await window.bplus.confirmDialog({
+    title: en ? 'Delete file' : 'حذف الملف',
+    message: en ? `Move "${item.name}" to the Recycle Bin?` : `نقل "${item.name}" إلى سلة المحذوفات؟`,
+    detail: en ? 'You can restore it from the Recycle Bin later.' : 'يمكنك استعادته لاحقًا من سلة المحذوفات.',
+    buttons: en ? ['Move to Recycle Bin', 'Cancel'] : ['نقل إلى سلة المحذوفات', 'إلغاء']
+  });
+  if (r !== 0) return;
+  const res = await window.bplus.trashItem(item.path);
+  if (res && res.ok) { removeAt(i); showOsd(en ? 'Moved to Recycle Bin' : 'تم النقل إلى سلة المحذوفات'); }
+  else showOsd(en ? 'Could not delete the file' : 'تعذر حذف الملف');
+}
+function sortPlaylist() {
+  const P = (window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.prefs) || {};
+  const key = P.sortBy || 'name', dir = P.sortDir === -1 ? -1 : 1;
+  const cur = playlist[current], sel = playlist[plSel];
+  const val = (it) => key === 'size' ? (it.size || 0) : key === 'date' ? (it.mtime || 0) : key === 'type' ? ((it.name.split('.').pop() || '').toLowerCase()) : (it.name || '').toLowerCase();
+  playlist.sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * dir; });
+  current = playlist.indexOf(cur);
+  plSel = playlist.indexOf(sel);
   renderPlaylist();
 }
 
@@ -295,7 +347,10 @@ function startViz(style) {
   const sm = new Float32Array(N);
   const hist = new Float32Array(N);
   const bandPeak = new Float32Array(N);
+  const peakCap = new Float32Array(N);
   let rmsPeak = 0.05;
+  let env = 0;
+  let histPhase = 0;
   let seeded = false;
   function frame() {
     if (audioViz.hidden || vizCanvas.hidden) { vizRaf = 0; return; }
@@ -326,13 +381,18 @@ function startViz(style) {
         let sum = 0;
         for (let j = 0; j < wave.length; j++) { const d = wave[j] - 128; sum += d * d; }
         const rms = Math.sqrt(sum / wave.length);
-        rmsPeak = Math.max(rms, rmsPeak * 0.997, 0.05);
-        v = Math.min(1, (rms / rmsPeak) * 0.82);
+        rmsPeak = Math.max(rms, rmsPeak * 0.995, 0.05);
+        const nv = Math.min(1, (rms / rmsPeak) * 0.9);
+        env += (nv - env) * (nv > env ? 0.55 : 0.10); // snap up on beats, glide down smoothly
+        v = env;
         if (!seeded) { hist.fill(v); seeded = true; } // no tapered ramp on style switch
       } else {
         v = 0.12 + 0.05 * Math.sin(t * 1.15) + 0.03 * Math.sin(t * 2.6);
+        env = v;
       }
-      hist.copyWithin(0, 1); hist[N - 1] += (v - hist[N - 1]) * 0.5;
+      hist[N - 1] += (v - hist[N - 1]) * 0.45;
+      histPhase ^= 1;
+      if (histPhase) hist.copyWithin(0, 1); // half-speed scroll: smooth, not jittery
       const hv = i => (hist[Math.max(0, i - 1)] + 2 * hist[i] + hist[Math.min(N - 1, i + 1)]) / 4;
       if (style === 'wave') {
         g2.beginPath();
@@ -367,8 +427,8 @@ function startViz(style) {
         for (let k = lo; k <= hi; k++) { const b = freq[k]; sum += b; if (b > peak) peak = b; }
         const band = sum / (hi - lo + 1) * 0.5 + peak * 0.5;
         const v = Math.sqrt(band / 255);
-        bandPeak[i] = Math.max(v, bandPeak[i] * 0.995, 0.10);
-        tv[i] = Math.min(1, v / bandPeak[i]);
+        bandPeak[i] = Math.max(v, bandPeak[i] * 0.9985, 0.35);
+        tv[i] = Math.min(1, (v / bandPeak[i]) * 0.95);
       } else {
         const env = Math.sin(Math.PI * i / (N - 1));
         tv[i] = env * (0.28 + 0.10 * Math.sin(t * 1.05 + i * 0.3)) + 0.05;
@@ -376,29 +436,28 @@ function startViz(style) {
     }
     for (let i = 0; i < N; i++) {
       const v = tv[i];
-      sm[i] += (v - sm[i]) * (v > sm[i] ? 0.30 : 0.08); // quick attack, slow release
+      sm[i] += (v - sm[i]) * (v > sm[i] ? 0.62 : 0.16); // fast attack on the beat, smooth decay
     }
-    // soften band-to-band steps so the shape reads as one calm whole, not pickets
-    for (let i = 0; i < N; i++) {
-      const a = sm[Math.max(0, i - 1)], b = sm[i], c = sm[Math.min(N - 1, i + 1)];
-      tv[i] = (a + 2 * b + c) / 4;
-    }
-    for (let i = 0; i < N; i++) sm[i] = tv[i];
+    // falling peak caps: hold each band's recent peak, then glide down
+    for (let i = 0; i < N; i++) peakCap[i] = Math.max(sm[i], peakCap[i] - 0.009);
     if (style === 'spectrum') {
       const bw = W / N, r = Math.min(2.5 * dpr, bw * 0.22);
       for (let i = 0; i < N; i++) {
-        const h = Math.max(2.5 * dpr, sm[i] * H * 0.74);
-        g2.globalAlpha = 0.42 + 0.58 * Math.min(1, sm[i] * 1.5);
+        const h = Math.max(2.5 * dpr, sm[i] * H * 0.78);
+        g2.globalAlpha = 0.45 + 0.55 * Math.min(1, sm[i] * 1.5);
         g2.beginPath();
         g2.roundRect(i * bw + bw * 0.27, mid - h / 2, bw * 0.46, h, r);
         g2.fill();
+        const ch = Math.max(h + 2 * dpr, peakCap[i] * H * 0.78);
+        g2.globalAlpha = 0.9;
+        g2.fillRect(i * bw + bw * 0.27, mid - ch / 2 - dpr, bw * 0.46, 2 * dpr);
       }
       g2.globalAlpha = 1;
     } else if (style === 'dots') {
       const bw = W / N;
       for (let i = 0; i < N; i++) {
-        const r = 1.6 * dpr + sm[i] * bw * 0.26;
-        g2.globalAlpha = 0.35 + 0.65 * Math.min(1, sm[i] * 1.6);
+        const r = 1.8 * dpr + sm[i] * bw * 0.40;
+        g2.globalAlpha = 0.30 + 0.70 * Math.min(1, sm[i] * 1.7);
         g2.beginPath(); g2.arc(i * bw + bw / 2, mid, r, 0, 7); g2.fill();
       }
       g2.globalAlpha = 1;
@@ -449,9 +508,9 @@ function startCoverEq() {
       let sum = 0, peak = 0;
       for (let k = lo; k <= hi; k++) { const b = freq[k]; sum += b; if (b > peak) peak = b; }
       const v = Math.sqrt((sum / (hi - lo + 1) * 0.5 + peak * 0.5) / 255);
-      bandPeak[i] = Math.max(v, bandPeak[i] * 0.995, 0.10);
-      const t = Math.min(1, v / bandPeak[i]);
-      sm[i] += (t - sm[i]) * (t > sm[i] ? 0.3 : 0.08);
+      bandPeak[i] = Math.max(v, bandPeak[i] * 0.9985, 0.35);
+      const t = Math.min(1, (v / bandPeak[i]) * 0.95);
+      sm[i] += (t - sm[i]) * (t > sm[i] ? 0.62 : 0.16);
       spans[i].style.height = (14 + sm[i] * 86) + '%';
     }
   }
@@ -515,6 +574,22 @@ $('pl-repeat').onclick = () => {
   localStorage.setItem('bplus-repeat', repeatMode);
   syncRepeatShuffleUI();
   showOsd(L('التكرار: ', 'Repeat: ') + (repeatMode === 'off' ? L('إيقاف', 'Off') : repeatMode === 'all' ? L('الكل', 'All') : L('واحد', 'One')));
+};
+$('pl-sort').onclick = (ev) => {
+  ev.stopPropagation();
+  const P = window.BPLUS_SETTINGS.prefs;
+  showPop(menuPop, $('pl-sort'), (c) => {
+    popHead(c, L('ترتيب القائمة', 'Sort playlist'));
+    [['name', L('الاسم', 'Name')], ['date', L('تاريخ التعديل', 'Date modified')], ['size', L('الحجم', 'Size')], ['type', L('النوع', 'Type')]].forEach(([k, label]) => {
+      popItem(c, label, null, () => { P.sortBy = k; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortBy === k });
+    });
+    popSep(c);
+    popItem(c, L('تصاعدي', 'Ascending'), null, () => { P.sortDir = 1; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortDir !== -1 });
+    popItem(c, L('تنازلي', 'Descending'), null, () => { P.sortDir = -1; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortDir === -1 });
+    popSep(c);
+    popItem(c, L('عكس الترتيب', 'Reverse order'), null, () => { const cur = playlist[current], sel = playlist[plSel]; playlist.reverse(); current = playlist.indexOf(cur); plSel = playlist.indexOf(sel); renderPlaylist(); });
+    popItem(c, L('خلط الترتيب', 'Shuffle order'), null, () => { const cur = playlist[current], sel = playlist[plSel]; for (let i = playlist.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [playlist[i], playlist[j]] = [playlist[j], playlist[i]]; } current = playlist.indexOf(cur); plSel = playlist.indexOf(sel); renderPlaylist(); });
+  });
 };
 $('pl-shuffle').onclick = () => {
   shuffleOn = !shuffleOn;
@@ -658,7 +733,12 @@ $('b-sub').onclick = () => window.bplus.openSubtitleDialog();
 bSubVis.onclick = toggleSubtitleVisible;
 $('b-snap').onclick = takeSnapshot;
 $('b-pl').onclick = () => playlistEl.classList.toggle('hidden');
-$('tb-pl').onclick = () => playlistEl.classList.toggle('hidden');
+$('tb-pin').onclick = async () => {
+  const P = window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.prefs;
+  const on = await window.bplus.setAlwaysOnTop(!(P && P.alwaysOnTop));
+  if (P) { P.alwaysOnTop = on; window.BPLUS_SETTINGS.save(); }
+  $('tb-pin').classList.toggle('on', on);
+};
 $('tb-open').onclick = () => window.bplus.openFiles();
 $('pl-add').onclick = () => window.bplus.openFiles();
 $('pl-clear').onclick = () => { playbackSerial++;window.bplus.cancelPreparation();prep.hidden=true;audioViz.hidden=true;savePosition();activeResumeKey=null;playlist = []; current = -1; player.removeAttribute('src'); player.load(); setPlayingUI(false); titleLabel.textContent = ''; tbTitle.textContent = ''; renderPlaylist(); };
@@ -736,7 +816,7 @@ $('tb-menu').onclick = (ev) => {
     popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen);
     popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen);
     popSep(c);
-    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open('playback'));
+    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open());
     popItem(c, L('حول B+', 'About B+'), null, () => window.dispatchEvent(new Event('bplus-about')));
     popItem(c, L('خروج', 'Exit'), null, () => window.bplus.winClose());
   });
@@ -770,7 +850,7 @@ $('video-wrap').addEventListener('contextmenu', (e) => {
     popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen);
     popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen);
     popSep(c);
-    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open('playback'));
+    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open());
   });
 });
 document.addEventListener('click', hidePops);
@@ -792,6 +872,7 @@ document.addEventListener('keydown', (e) => {
   if (ctrl && e.key.toLowerCase() === 'l') { e.preventDefault(); window.bplus.openSubtitleDialog(); return; }
   if (ctrl && e.key.toLowerCase() === 't') { e.preventDefault(); toggleSubtitleVisible(); return; }
   if (ctrl && e.key.toLowerCase() === 'p') { e.preventDefault(); playlistEl.classList.toggle('hidden'); return; }
+  if (e.key === 'Delete' && plSel >= 0 && playlist[plSel] && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) { e.preventDefault(); if (e.shiftKey) trashAt(plSel); else removeAt(plSel); return; }
   if (ctrl && e.key === 'ArrowUp') { e.preventDefault(); stepRate(1); return; }
   if (ctrl && e.key === 'ArrowDown') { e.preventDefault(); stepRate(-1); return; }
   if (e.key === 'F11') { e.preventDefault(); toggleFullscreen(); return; }

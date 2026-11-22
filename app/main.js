@@ -89,7 +89,10 @@ ipcMain.handle('update:prompt',async(e,info)=>{
  return false;
 });
 ipcMain.handle('app:version',()=>app.getVersion());
+ipcMain.handle('dialog:confirm',async(e,opts)=>{const r=await dialog.showMessageBox(win,{type:'warning',buttons:opts.buttons,defaultId:0,cancelId:1,title:opts.title,message:opts.message,detail:opts.detail});return r.response;});
+ipcMain.handle('media:trash',async(e,p)=>{try{await shell.trashItem(p);return {ok:true};}catch(err){return {ok:false,error:String(err)};}});
 ipcMain.handle('window:opacity',(e,value)=>{if(win)win.setOpacity(Math.min(1,Math.max(.65,Number(value)||1)));});
+ipcMain.handle('window:always-on-top',(e,flag)=>{if(!win)return false;win.setAlwaysOnTop(!!flag);return win.isAlwaysOnTop();});
 ipcMain.handle('system:theme',()=>require('electron').nativeTheme.shouldUseDarkColors?'dark':'light');
 
 if (process.env.BPLUS_TEST || process.env.BPLUS_DEMO) {
@@ -98,7 +101,9 @@ if (process.env.BPLUS_TEST || process.env.BPLUS_DEMO) {
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 function mediaEntry(p) {
-  return { path: p, url: pathToFileURL(p).href, name: path.basename(p) };
+  const e = { path: p, url: pathToFileURL(p).href, name: path.basename(p) };
+  try { const s = fs.statSync(p); e.size = s.size; e.mtime = s.mtimeMs; } catch {}
+  return e;
 }
 
 function send(channel, payload) {

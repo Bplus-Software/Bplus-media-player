@@ -15,13 +15,13 @@
         <svg data-ic="menu"></svg>
       </button>
     </div>
-    <div id="tb-drag"><span id="tb-title"></span></div>
+    <div id="tb-drag"><span id="tb-title" dir="auto"></span></div>
     <div class="tb-side tb-win">
       <button class="tbtn" id="tb-open" title="فتح ملف">
         <svg data-ic="open"></svg>
       </button>
-      <button class="tbtn" id="tb-pl" title="قائمة التشغيل">
-        <svg data-ic="playlist"></svg>
+      <button class="tbtn" id="tb-pin" title="تثبيت في المقدمة">
+        <svg data-ic="pin"></svg>
       </button>
       <span class="tb-sep"></span>
       <button class="tbtn" id="tb-purefs" title="ملء الشاشة بدون قوائم">
@@ -56,6 +56,7 @@
         <span class="pl-title">قائمة التشغيل</span>
         <span id="pl-count">0</span>
         <div class="pl-tools">
+          <button id="pl-sort" title="ترتيب"><svg data-ic="sort"></svg></button>
           <button id="pl-repeat" class="" title="تكرار: إيقاف"><svg data-ic="repeat"></svg><span class="rep-one" hidden>1</span></button>
           <button id="pl-shuffle" title="تشغيل عشوائي"><svg data-ic="shuffle"></svg></button>
           <button id="pl-add" title="إضافة ملفات"><svg data-ic="plus"></svg></button>
@@ -95,7 +96,7 @@
       <span class="bar-sep"></span>
       <div id="times"><span id="t-cur">00:00:00</span><span class="sep">/</span><span id="t-dur">00:00:00</span></div>
       <div id="spacer"></div>
-      <div id="title-label"></div>
+      <div id="title-label" dir="auto"></div>
       <button id="b-sub" class="ctl txt" title="تحميل ملف ترجمة">CC</button>
       <button id="b-subvis" class="ctl txt off" title="إظهار/إخفاء الترجمة">SUB</button>
       <button id="b-snap" class="ctl" title="لقطة شاشة">
