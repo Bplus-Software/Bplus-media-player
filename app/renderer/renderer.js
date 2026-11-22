@@ -330,7 +330,7 @@ function startViz(style) {
   const wave = new Uint8Array(analyser ? analyser.fftSize : 2048);
   const t0 = performance.now();
   const timeDomain = style === 'wave' || style === 'line';
-  const N = style === 'spectrum' ? 40 : style === 'dots' ? 24 : style === 'ripple' ? 8 : 110;
+  const N = style === 'spectrum' ? 40 : style === 'dots' ? 24 : style === 'ripple' ? 5 : 110;
   // Log-spaced bands across the audible range, so every column maps to real
   // musical content: bass on the left, treble on the right, no dead zones.
   let sampleRate = 48000;
@@ -369,7 +369,7 @@ function startViz(style) {
     const W = vizCanvas.width, H = vizCanvas.height, mid = H / 2;
     g2.clearRect(0, 0, W, H);
     if (fade <= 0.003) return; // fully faded out: stay on rAF, draw nothing
-    let accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim();
+    let accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent-viz') || '').trim();
     if (!/^#[0-9a-f]{6}$/i.test(accent)) accent = '#2f89fc';
     let live = false;
     if (analyser && !player.paused) {
@@ -496,17 +496,17 @@ function startViz(style) {
     } else if (style === 'ripple') {
       // Clean concentric rings expanding with the music around the B+ mark.
       const cx = W / 2, cy = mid;
-      const maxR = Math.min(W, H) * 0.42;
+      const maxR = Math.min(W, H) * 0.40; // sized so a fully pulsed ring stays on canvas
       for (let i = 0; i < N; i++) {
-        const base = maxR * (0.30 + 0.70 * i / (N - 1));
-        const r = base * (1 + sm[i] * 0.16); // ring expands with its band
-        g2.globalAlpha = fade * (0.22 + 0.68 * Math.min(1, sm[i] * 1.3));
-        g2.lineWidth = (2.8 - 1.2 * i / (N - 1)) * dpr;
+        const base = maxR * (0.26 + 0.74 * i / (N - 1));
+        const r = base * (1 + sm[i] * 0.22); // ring expands with its band
+        g2.globalAlpha = fade * (0.18 + 0.80 * Math.min(1, sm[i] * 1.4)); // brightness follows the hit
+        g2.lineWidth = (2.6 + 2.4 * Math.min(1, sm[i] * 1.4)) * (1 - 0.35 * i / (N - 1)) * dpr; // beats draw thicker
         g2.beginPath(); g2.arc(cx, cy, r, 0, 7); g2.stroke();
       }
       // B+ mark at the centre, pulsing gently with the overall level
       let lvl = 0; for (let i = 0; i < N; i++) lvl += sm[i]; lvl /= N;
-      const fs = maxR * 0.42 * (1 + lvl * 0.10);
+      const fs = maxR * 0.30 * (1 + lvl * 0.06);
       g2.globalAlpha = fade * (0.55 + 0.45 * Math.min(1, lvl * 1.6));
       g2.font = `700 ${fs}px Cairo, 'Segoe UI', sans-serif`;
       g2.textAlign = 'center'; g2.textBaseline = 'middle';
