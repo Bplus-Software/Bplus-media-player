@@ -355,6 +355,8 @@ function startViz(style) {
   let histPhase = 0;
   let seeded = false;
   let fade = 0; // soft in/out: appears on play / style switch, disappears on pause
+  const sparks = []; // Circles style: dash particles bursting outward with the beat
+  let prevBass = 0;
   function frame() {
     if (audioViz.hidden || vizCanvas.hidden) { vizRaf = 0; return; }
     vizRaf = requestAnimationFrame(frame);
@@ -497,6 +499,7 @@ function startViz(style) {
       // Clean concentric rings expanding with the music around the B+ mark.
       const cx = W / 2, cy = mid;
       const maxR = Math.min(W, H) * 0.40; // sized so a fully pulsed ring stays on canvas
+      let lvl = 0; for (let i = 0; i < N; i++) lvl += sm[i]; lvl /= N;
       for (let i = 0; i < N; i++) {
         const base = maxR * (0.26 + 0.74 * i / (N - 1));
         const r = base * (1 + sm[i] * 0.22); // ring expands with its band
@@ -504,8 +507,27 @@ function startViz(style) {
         g2.lineWidth = (2.6 + 2.4 * Math.min(1, sm[i] * 1.4)) * (1 - 0.35 * i / (N - 1)) * dpr; // beats draw thicker
         g2.beginPath(); g2.arc(cx, cy, r, 0, 7); g2.stroke();
       }
+      // sparks: short round dashes around the rings, bursting outward on the
+      // beat and with the overall level, fading as they travel
+      if (!player.paused) {
+        const bursts = (sm[0] - prevBass > 0.10) ? 4 : (Math.random() < lvl * 0.55 ? 1 : 0);
+        for (let b = 0; b < bursts && sparks.length < 26; b++) {
+          sparks.push({ a: Math.random() * Math.PI * 2, r: maxR * (0.45 + Math.random() * 0.45), v: (1.1 + Math.random() * 1.6) * dpr, len: (7 + Math.random() * 14) * dpr, w: (2.4 + Math.random() * 1.6) * dpr, life: 1 });
+        }
+      }
+      prevBass = sm[0];
+      g2.lineCap = 'round';
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        if (!player.paused) { s.r += s.v; s.life -= 0.022; }
+        if (s.life <= 0 || s.r - s.len > maxR * 1.5) { sparks.splice(i, 1); continue; }
+        g2.globalAlpha = fade * s.life * 0.85;
+        g2.lineWidth = s.w;
+        const dx = Math.cos(s.a), dy = Math.sin(s.a);
+        g2.beginPath(); g2.moveTo(cx + dx * s.r, cy + dy * s.r); g2.lineTo(cx + dx * (s.r + s.len), cy + dy * (s.r + s.len)); g2.stroke();
+      }
+      g2.lineCap = 'butt';
       // B+ mark at the centre, pulsing gently with the overall level
-      let lvl = 0; for (let i = 0; i < N; i++) lvl += sm[i]; lvl /= N;
       const fs = maxR * 0.30 * (1 + lvl * 0.06);
       g2.globalAlpha = fade * (0.55 + 0.45 * Math.min(1, lvl * 1.6));
       g2.font = `700 ${fs}px Cairo, 'Segoe UI', sans-serif`;
