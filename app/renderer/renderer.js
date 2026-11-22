@@ -326,13 +326,13 @@ function startViz(style) {
   try { window.BPLUS_SETTINGS.audio(); analyser = window.BPLUS_SETTINGS.getAudio().analyser || null; } catch (e) {}
   const g2 = vizCanvas.getContext('2d');
   const freq = new Uint8Array(analyser ? analyser.frequencyBinCount : 1024);
+  const ffreq = new Float32Array(analyser ? analyser.frequencyBinCount : 1024);
   const wave = new Uint8Array(analyser ? analyser.fftSize : 2048);
   const t0 = performance.now();
   const timeDomain = style === 'wave' || style === 'line';
   const N = style === 'spectrum' ? 40 : style === 'dots' ? 24 : style === 'ripple' ? 4 : 110;
   // Log-spaced bands across the audible range, so every column maps to real
   // musical content: bass on the left, treble on the right, no dead zones.
-  // (The old linear bin mapping crowded all energy into the left ~40%.)
   let sampleRate = 48000;
   try { sampleRate = (window.BPLUS_SETTINGS.getAudio().ctx || {}).sampleRate || 48000; } catch (e) {}
   const binHz = (sampleRate / 2) / freq.length;
@@ -345,17 +345,22 @@ function startViz(style) {
     bands.push([lo, hi]);
   }
   const sm = new Float32Array(N);
+  const bandLo = new Float32Array(N);
+  const bandHi = new Float32Array(N);
+  let freqSeeded = false;
   const hist = new Float32Array(N);
-  const bandPeak = new Float32Array(N);
   const peakCap = new Float32Array(N);
   let rmsPeak = 0.05;
   let env = 0;
   let histPhase = 0;
   let seeded = false;
+  let fade = 0; // soft in/out: appears on play / style switch, disappears on pause
   function frame() {
     if (audioViz.hidden || vizCanvas.hidden) { vizRaf = 0; return; }
     vizRaf = requestAnimationFrame(frame);
-    if (player.paused) return; // frozen when paused: touch nothing, last frame stays
+    const fadeT = player.paused ? 0 : 1;
+    fade += (fadeT - fade) * (fadeT > fade ? 0.11 : 0.055); // quick in, gentle out
+    if (Math.abs(fadeT - fade) < 0.004) fade = fadeT;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const cw = vizCanvas.clientWidth, chh = vizCanvas.clientHeight;
     if (!cw || !chh) return;
@@ -363,13 +368,14 @@ function startViz(style) {
     if (vizCanvas.width !== pw || vizCanvas.height !== ph) { vizCanvas.width = pw; vizCanvas.height = ph; }
     const W = vizCanvas.width, H = vizCanvas.height, mid = H / 2;
     g2.clearRect(0, 0, W, H);
+    if (fade <= 0.003) return; // fully faded out: stay on rAF, draw nothing
     let accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim();
     if (!/^#[0-9a-f]{6}$/i.test(accent)) accent = '#2f89fc';
     let live = false;
-    if (analyser) {
+    if (analyser && !player.paused) {
       try {
         if (timeDomain) { analyser.getByteTimeDomainData(wave); live = wave.some(v => Math.abs(v - 128) > 2); }
-        else { analyser.getByteFrequencyData(freq); live = freq.some(v => v > 2); }
+        else { analyser.getFloatFrequencyData(ffreq); live = ffreq.some(v => v > -95); }
       } catch (e) { live = false; }
     }
     const t = (performance.now() - t0) / 1000;
@@ -386,86 +392,112 @@ function startViz(style) {
         env += (nv - env) * (nv > env ? 0.55 : 0.10); // snap up on beats, glide down smoothly
         v = env;
         if (!seeded) { hist.fill(v); seeded = true; } // no tapered ramp on style switch
-      } else {
+      } else if (!player.paused) {
         v = 0.12 + 0.05 * Math.sin(t * 1.15) + 0.03 * Math.sin(t * 2.6);
         env = v;
+      } else {
+        v = hist[N - 1];
       }
-      hist[N - 1] += (v - hist[N - 1]) * 0.45;
-      histPhase ^= 1;
-      if (histPhase) hist.copyWithin(0, 1); // half-speed scroll: smooth, not jittery
+      if (!player.paused) {
+        hist[N - 1] += (v - hist[N - 1]) * 0.45;
+        histPhase ^= 1;
+        if (histPhase) hist.copyWithin(0, 1); // half-speed scroll: smooth, not jittery
+      }
       const hv = i => (hist[Math.max(0, i - 1)] + 2 * hist[i] + hist[Math.min(N - 1, i + 1)]) / 4;
       if (style === 'wave') {
         g2.beginPath();
         for (let i = 0; i < N; i++) { const x = i / (N - 1) * W; i ? g2.lineTo(x, mid - hv(i) * H * 0.34) : g2.moveTo(x, mid - hv(i) * H * 0.34); }
         for (let i = N - 1; i >= 0; i--) g2.lineTo(i / (N - 1) * W, mid + hv(i) * H * 0.34);
         g2.closePath();
-        g2.globalAlpha = 0.75; g2.fill();
-        g2.globalAlpha = 1; g2.lineWidth = 1.6 * dpr; g2.lineJoin = 'round';
+        g2.globalAlpha = 0.75 * fade; g2.fill();
+        g2.globalAlpha = fade; g2.lineWidth = 1.6 * dpr; g2.lineJoin = 'round';
         g2.beginPath();
         for (let i = 0; i < N; i++) { const x = i / (N - 1) * W; i ? g2.lineTo(x, mid - hv(i) * H * 0.34) : g2.moveTo(x, mid - hv(i) * H * 0.34); }
         g2.stroke();
       } else {
         // line: calm envelope graph
+        g2.globalAlpha = fade;
         g2.lineWidth = 2.2 * dpr; g2.lineJoin = 'round'; g2.lineCap = 'round';
         g2.beginPath();
         for (let i = 0; i < N; i++) { const x = i / (N - 1) * W; const y = H * 0.78 - hv(i) * H * 0.55; i ? g2.lineTo(x, y) : g2.moveTo(x, y); }
         g2.stroke();
-        g2.globalAlpha = 0.2; g2.lineWidth = dpr;
+        g2.globalAlpha = 0.2 * fade; g2.lineWidth = dpr;
         g2.beginPath(); g2.moveTo(0, H * 0.78); g2.lineTo(W, H * 0.78); g2.stroke();
-        g2.globalAlpha = 1;
       }
+      g2.globalAlpha = 1;
       return;
     }
-    // frequency styles: each log band is normalized against its own slow-running
-    // peak, so quiet treble bands move as much as loud bass ones and the shape
-    // stays balanced across the whole width on any audio.
+    // frequency styles: absolute dynamics (beats punch through) with a slow
+    // per-band AGC that only balances long-run loudness, so loud steady bands
+    // keep moving and quiet treble bands stay visible across the whole width.
     const tv = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       if (live) {
+        // per-band rolling min-max window (float dB data): each band's own
+        // recent range maps to 0..1 with ~1-3s adaptation, so bass, mids and
+        // treble all move with the music - loud bands can't pin at the top and
+        // quiet bands can't flatline at zero.
         const [lo, hi] = bands[i];
-        let sum = 0, peak = 0;
-        for (let k = lo; k <= hi; k++) { const b = freq[k]; sum += b; if (b > peak) peak = b; }
-        const band = sum / (hi - lo + 1) * 0.5 + peak * 0.5;
-        const v = Math.sqrt(band / 255);
-        bandPeak[i] = Math.max(v, bandPeak[i] * 0.9985, 0.35);
-        tv[i] = Math.min(1, (v / bandPeak[i]) * 0.95);
-      } else {
+        let peak = -Infinity;
+        for (let k = lo; k <= hi; k++) { const b = ffreq[k]; if (b > peak) peak = b; }
+        if (!freqSeeded) { bandLo[i] = peak - 3; bandHi[i] = peak + 3; }
+        if (peak > bandHi[i]) bandHi[i] = peak; else bandHi[i] -= 0.05;
+        if (peak < bandLo[i]) bandLo[i] = peak; else bandLo[i] += 0.03;
+        const range = Math.max(bandHi[i] - bandLo[i], 6);
+        tv[i] = Math.min(1, Math.max(0, (peak - bandLo[i]) / range));
+      } else if (!player.paused) {
         const env = Math.sin(Math.PI * i / (N - 1));
         tv[i] = env * (0.28 + 0.10 * Math.sin(t * 1.05 + i * 0.3)) + 0.05;
+        freqSeeded = false;
+      } else {
+        tv[i] = sm[i]; // frozen while paused, fading out
       }
     }
-    for (let i = 0; i < N; i++) {
-      const v = tv[i];
-      sm[i] += (v - sm[i]) * (v > sm[i] ? 0.62 : 0.16); // fast attack on the beat, smooth decay
+    if (live) freqSeeded = true;
+    if (!player.paused) {
+      for (let i = 0; i < N; i++) {
+        const v = tv[i];
+        sm[i] += (v - sm[i]) * (v > sm[i] ? 0.62 : 0.16); // fast attack on the beat, smooth decay
+      }
+      // falling peak caps: hold each band's recent peak, then glide down
+      for (let i = 0; i < N; i++) peakCap[i] = Math.max(sm[i], peakCap[i] - 0.009);
     }
-    // falling peak caps: hold each band's recent peak, then glide down
-    for (let i = 0; i < N; i++) peakCap[i] = Math.max(sm[i], peakCap[i] - 0.009);
     if (style === 'spectrum') {
       const bw = W / N, r = Math.min(2.5 * dpr, bw * 0.22);
       for (let i = 0; i < N; i++) {
         const h = Math.max(2.5 * dpr, sm[i] * H * 0.78);
-        g2.globalAlpha = 0.45 + 0.55 * Math.min(1, sm[i] * 1.5);
+        g2.globalAlpha = fade * (0.45 + 0.55 * Math.min(1, sm[i] * 1.5));
         g2.beginPath();
         g2.roundRect(i * bw + bw * 0.27, mid - h / 2, bw * 0.46, h, r);
         g2.fill();
         const ch = Math.max(h + 2 * dpr, peakCap[i] * H * 0.78);
-        g2.globalAlpha = 0.9;
+        g2.globalAlpha = 0.9 * fade;
         g2.fillRect(i * bw + bw * 0.27, mid - ch / 2 - dpr, bw * 0.46, 2 * dpr);
       }
       g2.globalAlpha = 1;
     } else if (style === 'dots') {
+      // LED columns of round dots, centered like the bars: same accent, same
+      // heights, lit dots over faint unlit ones - one visual language.
       const bw = W / N;
+      const maxDots = Math.max(6, Math.floor(H * 0.78 / (9 * dpr)));
+      const stepY = (H * 0.78) / maxDots;
+      const rD = Math.min(bw * 0.20, stepY * 0.34, 3.4 * dpr);
+      const half = (maxDots - 1) / 2;
       for (let i = 0; i < N; i++) {
-        const r = 1.8 * dpr + sm[i] * bw * 0.40;
-        g2.globalAlpha = 0.30 + 0.70 * Math.min(1, sm[i] * 1.7);
-        g2.beginPath(); g2.arc(i * bw + bw / 2, mid, r, 0, 7); g2.fill();
+        const lit = sm[i] * half + 0.5;
+        for (let d = 0; d < maxDots; d++) {
+          const on = Math.abs(d - half) < lit;
+          g2.globalAlpha = fade * (on ? 0.35 + 0.65 * Math.min(1, sm[i] * 1.4) : 0.10);
+          const y = mid + (d - half) * stepY;
+          g2.beginPath(); g2.arc(i * bw + bw / 2, y, rD, 0, 7); g2.fill();
+        }
       }
       g2.globalAlpha = 1;
     } else if (style === 'ripple') {
       const maxR = Math.min(W, H) * 0.44;
       for (let i = 0; i < N; i++) {
         const r = maxR * (0.22 + i * 0.26) * (1 + sm[i] * 0.30);
-        g2.globalAlpha = Math.max(0.14, 0.8 - i * 0.2);
+        g2.globalAlpha = fade * Math.max(0.14, 0.8 - i * 0.2);
         g2.lineWidth = (2.6 - i * 0.35) * dpr;
         g2.beginPath(); g2.arc(W / 2, mid, r, 0, 7); g2.stroke();
       }
@@ -474,6 +506,7 @@ function startViz(style) {
   }
   if (!vizRaf) frame();
 }
+
 /* ---------- Cover-art equalizer bars (audio-reactive when possible) ---------- */
 let eqRaf = 0;
 function stopCoverEq() { if (eqRaf) cancelAnimationFrame(eqRaf); eqRaf = 0; }

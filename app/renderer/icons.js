@@ -175,4 +175,4 @@ function apply(id){if(!FAMILIES[id])id='phosphor';current=id;hydrate(document)}
 return{FAMILIES,LABELS,apply,hydrate,get current(){return current}};
 })();
 
-hydrate(document);
+BPLUS_ICONS.hydrate(document);

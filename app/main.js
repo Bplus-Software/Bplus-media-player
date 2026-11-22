@@ -41,9 +41,14 @@ function cmpVer(a,b){const p=s=>String(s||'').replace(/^v/i,'').split('.').map(n
 async function fetchLatestRelease(){
  const ua={'User-Agent':'Bplus-Player'};
  const nf=()=>require('electron').net.fetch;
- // Primary: GitHub API
+ const T=()=>AbortSignal.timeout(15000);
+ const synth=(tag)=>{const ver=String(tag).replace(/^v/i,'');
+  return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+tag+'/Bplus-'+ver+'-Setup.exe',size:0}};};
+ // Electron's net.fetch uses the Chromium network stack: the Windows system
+ // proxy and the Windows certificate store apply automatically.
+ // 1) GitHub API: exact JSON with the asset list.
  try{
-  const r=await nf()('https://api.github.com/repos/'+UPD_REPO+'/releases/latest',{headers:ua});
+  const r=await nf()('https://api.github.com/repos/'+UPD_REPO+'/releases/latest',{headers:ua,signal:T()});
   if(r.status===404)return{status:'none'};
   if(r.ok){
    const j=await r.json();
@@ -52,13 +57,21 @@ async function fetchLatestRelease(){
   }
   var lastErr='GitHub API: HTTP '+r.status;
  }catch(e){var lastErr='GitHub API: '+String(e&&e.message||e)}
- // Fallback: github.com/releases/latest redirects to the tag page - works even if api.github.com is filtered
+ // 2) Atom feed: plain XML over github.com, no redirect semantics involved.
  try{
-  const r2=await nf()('https://github.com/'+UPD_REPO+'/releases/latest',{headers:ua,redirect:'manual'});
-  const loc=r2.headers.get('location')||r2.url||'';
-  const m=/\/releases\/(?:tag|download)\/(v?[^\s/?#]+)/i.exec(loc);
-  if(m){const ver=m[1].replace(/^v/i,'');
-   return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+m[1]+'/Bplus-'+ver+'-Setup.exe',size:0}};}
+  const rA=await nf()('https://github.com/'+UPD_REPO+'/releases.atom',{headers:ua,signal:T()});
+  if(rA.ok){
+   const xml=await rA.text();
+   const m=/\/releases\/tag\/(v?[^\s/?#<"]+)/i.exec(xml);
+   if(m)return synth(m[1]);
+   lastErr+=' | atom feed: no release tag found';
+  }else lastErr+=' | atom feed: HTTP '+rA.status;
+ }catch(e){lastErr+=' | atom feed: '+String(e&&e.message||e)}
+ // 3) releases/latest: follow the redirect, the final URL carries the tag.
+ try{
+  const r2=await nf()('https://github.com/'+UPD_REPO+'/releases/latest',{headers:ua,signal:T()});
+  const m=/\/releases\/(?:tag|download)\/(v?[^\s/?#]+)/i.exec(r2.url||'');
+  if(m)return synth(m[1]);
   lastErr+=' | github.com: HTTP '+r2.status;
  }catch(e){lastErr+=' | github.com: '+String(e&&e.message||e)}
  return{status:'error',message:lastErr};
@@ -67,7 +80,7 @@ ipcMain.handle('update:check',async()=>{
  try{
   const rel=await fetchLatestRelease();
   if(rel.status==='none')return{status:'none'};
-  if(rel.status==='error')return{status:'error'};
+  if(rel.status==='error'){const lp=path.join(app.getPath('userData'),'update-check.log');try{fs.appendFileSync(lp,new Date().toISOString()+' '+(rel.message||'unknown')+'\n')}catch(e){}return{status:'error',message:rel.message,logPath:lp};}
   if(!rel.asset)return{status:'error',message:'no-asset'};
   return{status:cmpVer(rel.version,app.getVersion())>0?'available':'latest',version:rel.version,name:rel.name,notes:rel.notes,asset:rel.asset};
  }catch(e){return{status:'error',message:String(e&&e.message||e)}}
