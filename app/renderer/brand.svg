@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="g" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#56b2ff"/><stop offset="1" stop-color="#1254c4"/>
+    </linearGradient>
+    <clipPath id="tri"><path d="M 143.36 61.44 L 143.36 962.56 L 921.6 512.0 Z"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="205" fill="#ffffff"/>
+  <g transform="translate(97.28 97.28) scale(0.81)">
+    <g clip-path="url(#tri)">
+      <path d="M 143.36 61.44 L 143.36 962.56 L 921.6 512.0 Z" fill="url(#g)"/>
+      <ellipse cx="300" cy="-30" rx="540" ry="330" fill="#ffffff" opacity="0.16"/>
+      <ellipse cx="620" cy="1140" rx="520" ry="330" fill="#0a3478" opacity="0.14"/>
+      <path fill-rule="nonzero" fill="#ffffff" d="M 215.04 353.28 H 253.95 V 762.88 H 215.04 Z M 215.04 353.28 H 368.64 A 109.06 109.06 0 0 1 368.64 571.39 H 215.04 Z M 215.04 532.48 H 368.64 A 115.2 115.2 0 0 1 368.64 762.88 H 215.04 Z M 253.95 392.19 V 532.48 H 368.64 A 70.14 70.14 0 0 0 368.64 392.19 Z M 253.95 571.39 V 723.97 H 368.64 A 76.29 76.29 0 0 0 368.64 571.39 Z"/>
+      <path fill="#ffffff" d="M 577.23 488.45 h 38.91 v 50.18 h 50.18 v 38.91 h -50.18 v 50.18 h -38.91 v -50.18 h -50.18 v -38.91 h 50.18 Z"/>
+    </g>
+  </g>
+  <rect x="2" y="2" width="1020" height="1020" rx="203" fill="none" stroke="#d0d7e0" stroke-width="4"/>
+</svg>

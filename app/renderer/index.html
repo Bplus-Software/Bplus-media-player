@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>B+ Media Player</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' file: blob: data:;">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="titlebar">
+    <div class="tb-side">
+      <div id="brand"><span class="brand-b">B</span><span class="brand-plus">+</span></div>
+      <button id="tb-menu" class="tbtn" title="القائمة">
+        <svg data-ic="menu"></svg>
+      </button>
+    </div>
+    <div id="tb-drag"><span id="tb-title"></span></div>
+    <div class="tb-side tb-win">
+      <button class="tbtn" id="tb-open" title="فتح ملف">
+        <svg data-ic="open"></svg>
+      </button>
+      <button class="tbtn" id="tb-pl" title="قائمة التشغيل">
+        <svg data-ic="playlist"></svg>
+      </button>
+      <span class="tb-sep"></span>
+      <button class="tbtn" id="tb-purefs" title="ملء الشاشة بدون قوائم">
+        <svg data-ic="move"></svg>
+      </button>
+      <button id="win-min" class="win-btn" title="تصغير"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 8h9"/></svg></button>
+      <button id="win-max" class="win-btn" title="تكبير"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="3.8" width="8.4" height="8.4" rx="1"/></svg></button>
+      <button id="win-close" class="win-btn close" title="إغلاق"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+    </div>
+  </header>
+
+  <div id="stage">
+    <div id="video-wrap">
+      <video id="player" playsinline disableRemotePlayback disablePictureInPicture></video>
+      <div id="drop-hint">
+        <div id="hint-logo"><img class="brand-mark" src="brand.svg" alt="B+"></div>
+        <div class="hint-sub">أفلت ملفات الفيديو أو الصوت هنا، أو اضغط Ctrl+O</div>
+      </div>
+      <div id="audio-viz" hidden>
+        <img id="audio-cover" alt="" hidden>
+        <div id="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <div id="viz-box"><canvas id="viz-canvas" hidden></canvas></div>
+      </div>
+      <div id="osd"></div>
+      <button id="big-play" hidden>
+        <svg class="bp-play" data-ic="play"></svg>
+        <svg class="bp-pause" data-ic="pause" style="display:none"></svg>
+      </button>
+    </div>
+    <aside id="playlist">
+      <div id="pl-head">
+        <span class="pl-title">قائمة التشغيل</span>
+        <span id="pl-count">0</span>
+        <div class="pl-tools">
+          <button id="pl-repeat" class="" title="تكرار: إيقاف"><svg data-ic="repeat"></svg><span class="rep-one" hidden>1</span></button>
+          <button id="pl-shuffle" title="تشغيل عشوائي"><svg data-ic="shuffle"></svg></button>
+          <button id="pl-add" title="إضافة ملفات"><svg data-ic="plus"></svg></button>
+          <button id="pl-clear" title="مسح الكل"><svg data-ic="trash"></svg></button>
+        </div>
+      </div>
+      <ul id="pl-list"></ul>
+      <div id="pl-empty">القائمة فارغة<br><span>أضف ملفات للبدء</span></div>
+    </aside>
+  </div>
+
+  <div id="controls">
+    <div id="seek-wrap">
+      <div id="seek-track"><div id="seek-buffer"></div><div id="seek-fill"></div><div id="seek-thumb"></div></div>
+      <input type="range" id="seek" min="0" max="1000" value="0" dir="ltr">
+      <div id="seek-tip" hidden><canvas id="seek-tip-canvas" width="320" height="180"></canvas><div class="tip-time"></div></div>
+    </div>
+    <div id="btn-row">
+      <button id="b-play" class="ctl play" title="تشغيل / إيقاف">
+        <svg class="ic-play" data-ic="play"></svg>
+        <svg class="ic-pause" data-ic="pause" style="display:none"></svg>
+      </button>
+      <button id="b-stop" class="ctl" title="إيقاف"><svg data-ic="stop"></svg></button>
+      <button id="b-prev" class="ctl" title="السابق"><svg data-ic="prev"></svg></button>
+      <button id="b-next" class="ctl" title="التالي"><svg data-ic="next"></svg></button>
+      <span class="bar-sep"></span>
+      <div id="vol-wrap">
+        <button id="b-mute" class="ctl sm" title="كتم الصوت">
+          <svg class="ic-vol" data-ic="volume"></svg>
+          <svg class="ic-muted" data-ic="muted" style="display:none"></svg>
+        </button>
+        <div id="vol-slider-wrap"><div id="vol-track"><div id="vol-fill"></div></div>
+          <input type="range" id="vol" min="0" max="200" value="80" dir="ltr">
+        </div>
+        <span id="vol-num">80</span>
+      </div>
+      <span class="bar-sep"></span>
+      <div id="times"><span id="t-cur">00:00:00</span><span class="sep">/</span><span id="t-dur">00:00:00</span></div>
+      <div id="spacer"></div>
+      <div id="title-label"></div>
+      <button id="b-sub" class="ctl txt" title="تحميل ملف ترجمة">CC</button>
+      <button id="b-subvis" class="ctl txt off" title="إظهار/إخفاء الترجمة">SUB</button>
+      <button id="b-snap" class="ctl" title="لقطة شاشة">
+        <svg data-ic="camera"></svg>
+      </button>
+      <button id="b-speed" class="ctl txt" title="سرعة التشغيل">1×</button>
+      <button id="b-av" class="ctl" title="الصورة والصوت">
+        <svg data-ic="sliders"></svg>
+      </button>
+      <button id="b-set" class="ctl" title="الإعدادات"><svg data-ic="gear"></svg></button>
+      <button id="b-pl" class="ctl" title="قائمة التشغيل">
+        <svg data-ic="playlist"></svg>
+      </button>
+    </div>
+  </div>
+</div>
+<div id="menu-pop" hidden></div>
+<div id="ctx-menu" hidden></div>
+<script src="icons.js"></script>
+<script src="renderer.js"></script>
+<script src="identity.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

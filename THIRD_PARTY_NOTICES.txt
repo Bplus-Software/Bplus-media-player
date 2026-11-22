@@ -1,0 +1,21 @@
+B+ uses Electron, the castLabs Electron for Content Security distribution,
+Chromium and FFmpeg. Their license notices are distributed beside the app in
+LICENSE.electron.txt and LICENSES.chromium.html. Bundled Cairo fonts use the
+SIL Open Font License, included in app/fonts/OFL.txt inside app.asar.
+The B+ app code uses the MIT license in LICENSE.
+Bundled interface icons come from three open-source sets, shipped offline in
+app/renderer/icons.js with their licenses in app/renderer/licenses/:
+- Phosphor Icons (MIT), (c) 2023 Phosphor Icons - phosphor-MIT.txt
+- Lucide (ISC), (c) Lucide Contributors - lucide-ISC.txt
+- Material Symbols (Apache License 2.0), (c) Google - material-symbols-APACHE-2.0.txt
+Codec patent or distribution obligations can depend on jurisdiction. This
+prototype is not a claim to any rights in third-party codecs or GOM Player.
+
+The offline media helper resources/ffmpeg/ffmpeg.exe is an unmodified standalone
+FFmpeg executable from the BtbN/FFmpeg-Builds project. It runs as a separate
+process; B+ does not link to its libraries. Its GPL version 3 or later license
+is included as resources/ffmpeg/LICENSE.txt. Public source and build provenance
+are listed in resources/ffmpeg/PROVENANCE.json. The B+ application itself and
+its original icons remain MIT licensed. Third-party codec patents and terms
+may require separate review before any commercial or public distribution.
+The private development package is not a codec-rights or legal warranty.
