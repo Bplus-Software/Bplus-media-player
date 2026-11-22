@@ -330,7 +330,7 @@ function startViz(style) {
   const wave = new Uint8Array(analyser ? analyser.fftSize : 2048);
   const t0 = performance.now();
   const timeDomain = style === 'wave' || style === 'line';
-  const N = style === 'spectrum' ? 40 : style === 'dots' ? 24 : style === 'ripple' ? 4 : 110;
+  const N = style === 'spectrum' ? 40 : style === 'dots' ? 24 : style === 'ripple' ? 8 : 110;
   // Log-spaced bands across the audible range, so every column maps to real
   // musical content: bass on the left, treble on the right, no dead zones.
   let sampleRate = 48000;
@@ -494,13 +494,29 @@ function startViz(style) {
       }
       g2.globalAlpha = 1;
     } else if (style === 'ripple') {
-      const maxR = Math.min(W, H) * 0.44;
+      // B+ identity: dotted LED rings around the B+ mark - same round dots,
+      // same accent, same lit/dim language as the bars and dots styles.
+      const cx = W / 2, cy = mid;
+      const maxR = Math.min(W, H) * 0.42;
+      const rD = Math.min(3.4 * dpr, maxR * 0.028);
       for (let i = 0; i < N; i++) {
-        const r = maxR * (0.22 + i * 0.26) * (1 + sm[i] * 0.30);
-        g2.globalAlpha = fade * Math.max(0.14, 0.8 - i * 0.2);
-        g2.lineWidth = (2.6 - i * 0.35) * dpr;
-        g2.beginPath(); g2.arc(W / 2, mid, r, 0, 7); g2.stroke();
+        const base = maxR * (0.30 + 0.70 * i / (N - 1));
+        const r = base * (1 + sm[i] * 0.08); // ring breathes with its band
+        const dots = Math.max(10, Math.round((2 * Math.PI * base) / (rD * 3.4)));
+        const phase = (i % 2) * Math.PI / dots;
+        g2.globalAlpha = fade * (0.18 + 0.72 * Math.min(1, sm[i] * 1.3));
+        for (let d = 0; d < dots; d++) {
+          const a = phase + d * 2 * Math.PI / dots;
+          g2.beginPath(); g2.arc(cx + r * Math.cos(a), cy + r * Math.sin(a), rD, 0, 7); g2.fill();
+        }
       }
+      // B+ mark at the centre, pulsing gently with the overall level
+      let lvl = 0; for (let i = 0; i < N; i++) lvl += sm[i]; lvl /= N;
+      const fs = maxR * 0.42 * (1 + lvl * 0.10);
+      g2.globalAlpha = fade * (0.55 + 0.45 * Math.min(1, lvl * 1.6));
+      g2.font = `700 ${fs}px Cairo, 'Segoe UI', sans-serif`;
+      g2.textAlign = 'center'; g2.textBaseline = 'middle';
+      g2.fillText('B+', cx, cy + fs * 0.04);
       g2.globalAlpha = 1;
     }
   }
