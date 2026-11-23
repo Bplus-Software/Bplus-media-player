@@ -40,7 +40,8 @@ const UPD_REPO='basem-sadoun/Bplus';
 function cmpVer(a,b){const p=s=>String(s||'').replace(/^v/i,'').split('.').map(n=>parseInt(n,10)||0);const x=p(a),y=p(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]-y[i]}return 0}
 async function fetchLatestRelease(){
  const ua={'User-Agent':'Bplus-Player'};
- const nf=()=>require('electron').net.fetch;
+ // Chromium stack first (system proxy + cert store); if the session blocks it, fall back to Node's own fetch.
+ const nf=()=>async(url,opt)=>{try{return await require('electron').net.fetch(url,opt)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(url,opt);throw e}};
  const T=()=>AbortSignal.timeout(15000);
  const synth=(tag)=>{const ver=String(tag).replace(/^v/i,'');
   return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+tag+'/Bplus-'+ver+'-Setup.exe',size:0}};};
@@ -90,7 +91,7 @@ async function downloadUpdate(info){
  if(updDownloading)return{status:'busy'};
  updDownloading=true;
  try{
-  const r=await require('electron').net.fetch(info.asset.url,{headers:{'User-Agent':'Bplus-Player'}});
+  const r=await (async(u,o)=>{try{return await require('electron').net.fetch(u,o)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(u,o);throw e}})(info.asset.url,{headers:{'User-Agent':'Bplus-Player'}});
   if(!r.ok||!r.body){updDownloading=false;return{status:'error',code:r.status}}
   const dest=path.join(app.getPath('temp'),info.asset.name);
   const total=Number(r.headers.get('content-length'))||info.asset.size||0;
@@ -274,7 +275,14 @@ function createWindow() {
       spellcheck: false
     }
   });
-  win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (details, cb) => cb({ cancel: true }));
+  // The player window never talks to the network. Main-process requests (no webContentsId) to the
+// GitHub update hosts are allowed: the blanket block used to cancel our own updater (ERR_BLOCKED_BY_CLIENT).
+  const UPD_HOSTS = /^(?:api\.github\.com|github\.com|objects\.githubusercontent\.com|release-assets\.githubusercontent\.com|github-releases\.githubusercontent\.com)$/i;
+  win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (details, cb) => {
+    let ok = false;
+    try { const u = new URL(details.url); ok = u.protocol === 'https:' && UPD_HOSTS.test(u.hostname) && (details.webContentsId == null); } catch (e) {}
+    cb({ cancel: !ok });
+  });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', e => e.preventDefault());
   Menu.setApplicationMenu(null);
