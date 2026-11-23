@@ -44,9 +44,9 @@
     root.setProperty('--text-faint',dark?'#8a8a8a':'#555962');
     root.setProperty('--border',dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.1)');
     root.setProperty('--hover',dark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)');
-    if(prefs.shade<=2){ // lightest end: pure white surfaces, with a visible divider line between video and controls
-      ['--bg','--chrome','--chrome-2','--video-bg','--panel','--panel-head','--panel-nav'].forEach(v=>root.setProperty(v,'#ffffff'));
-      root.setProperty('--border','#cfd2d8'); // visible divider between video area and controls
+    if(prefs.shade<=2){ // lightest end: white video area, menus and controls one notch darker so they separate
+      ['--bg','--video-bg'].forEach(v=>root.setProperty(v,'#ffffff'));
+      [['--chrome','#e9ebee'],['--chrome-2','#dfe2e6'],['--panel','#eceef1'],['--panel-head','#e1e4e8'],['--panel-nav','#e6e8ec'],['--border','#c9cdd3']].forEach(([k,v])=>root.setProperty(k,v));
     }
   } else shadeVars.forEach(v=>root.removeProperty(v));
   document.documentElement.dataset.theme=theme;BPLUS_ICONS.apply(prefs.iconStyle);window.bplus.setOpacity(prefs.opacity/100);
@@ -189,7 +189,7 @@
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.4');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.5');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}
