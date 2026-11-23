@@ -233,13 +233,13 @@ svg[data-ic] { flex-shrink: 0; }
 
 /* Clean fullscreen: hide chrome, peek on mouse move */
 html:fullscreen body.fs-pure #titlebar { position: fixed; top: 0; left: 0; right: 0; z-index: 60;
-  transform: translateY(-100%); transition: transform .22s; background: rgba(30,30,32,.96); }
+  transform: translateY(-100%); transition: transform .12s; background: rgba(30,30,32,.96); }
 html:fullscreen body.fs-pure #controls { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
-  transform: translateY(100%); transition: transform .22s; background: rgba(30,30,32,.96); }
+  transform: translateY(100%); transition: transform .12s; background: rgba(30,30,32,.96); }
 html:fullscreen body.fs-pure #playlist { display: none; }
 html:fullscreen body.fs-pure.fs-peek #titlebar, html:fullscreen body.fs-pure.fs-peek #controls { transform: none; }
 html:fullscreen body.fs-pure #video-wrap { cursor: none; }
-html:fullscreen body.fs-pure.fs-peek #video-wrap { cursor: default; }
+html:fullscreen body.fs-pure.fs-cursor #video-wrap, html:fullscreen body.fs-pure.fs-peek #video-wrap { cursor: default; }
 
 /* Audio cover art + equalizer */
 #audio-viz { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; pointer-events: none; background: var(--video-bg); }
@@ -277,3 +277,6 @@ html:fullscreen body.fs-pure.fs-peek #video-wrap { cursor: default; }
 :root[data-theme=light] .sub-title{color:var(--text)}
 
 :root[data-theme=light] .accent-choice{background:none;border:0}:root[data-theme=light] .accent-choice:hover{background:#0000000f}:root[data-theme=light] .accent-choice[aria-pressed=true]{background:none;box-shadow:0 0 0 2px var(--accent)}
+
+.ctl.on,.tbtn.on{color:var(--accent)}
+#b-subvis.off{color:var(--text-faint)}

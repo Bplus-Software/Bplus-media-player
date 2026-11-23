@@ -249,11 +249,21 @@ function togglePureFullscreen() {
   }
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) setPureFs(false); });
-document.addEventListener('mousemove', () => {
+let fsHideTimer = null, fsCursorTimer = null;
+document.addEventListener('mousemove', (e) => {
   if (!pureFs || !document.fullscreenElement) return;
-  document.body.classList.add('fs-peek');
-  clearTimeout(peekTimer);
-  peekTimer = setTimeout(() => document.body.classList.remove('fs-peek'), 2200);
+  const onBar = e.target.closest && e.target.closest('#titlebar, #controls');
+  const edge = e.clientY <= 6 || e.clientY >= window.innerHeight - 6;
+  if (onBar || edge) {
+    document.body.classList.add('fs-peek');
+    clearTimeout(peekTimer);
+  } else if (document.body.classList.contains('fs-peek')) {
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(() => document.body.classList.remove('fs-peek'), 350);
+  }
+  document.body.classList.add('fs-cursor');
+  clearTimeout(fsCursorTimer);
+  fsCursorTimer = setTimeout(() => document.body.classList.remove('fs-cursor'), 1200);
 });
 
 /* ---------- Snapshot ---------- */
@@ -800,7 +810,7 @@ bigPlay.onclick = togglePlay;
 $('b-next').onclick = next;
 $('b-prev').onclick = prev;
 $('b-stop').onclick = () => { playbackSerial++;window.bplus.cancelPreparation();prep.hidden=true;audioViz.hidden=true;player.pause(); player.currentTime = 0; updateSeekUI(); };
-$('b-sub').onclick = () => window.bplus.openSubtitleDialog();
+bSubVis.addEventListener('contextmenu', (e) => { e.preventDefault(); window.bplus.openSubtitleDialog(); });
 bSubVis.onclick = toggleSubtitleVisible;
 $('b-snap').onclick = takeSnapshot;
 $('b-pl').onclick = () => playlistEl.classList.toggle('hidden');
@@ -1058,3 +1068,19 @@ async function receiveExternal(payload){
 }
 window.bplus.onExternalMedia(receiveExternal);
 window.addEventListener('DOMContentLoaded',async()=>{try{await receiveExternal(await window.bplus.pullLaunch())}catch(e){showOsd(L('تعذر فتح الملف: ','Could not open the file: ')+iso(e.message))}});
+
+
+/* ---------- Toggled-on buttons use the accent color ---------- */
+(function () {
+  const mark = (el, on) => { if (el) el.classList.toggle('on', !!on); };
+  const sync = () => {
+    mark($('b-mute'), player.muted || vol.value === '0');
+    mark($('b-speed'), player.playbackRate !== 1);
+    mark($('b-pl'), !playlistEl.classList.contains('hidden'));
+    mark($('tb-purefs'), pureFs);
+    const qa = document.getElementById('quick-av');
+    mark($('b-av'), qa && !qa.hidden);
+  };
+  setInterval(sync, 250);
+  sync();
+})();

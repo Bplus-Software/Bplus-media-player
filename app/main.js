@@ -36,7 +36,7 @@ ipcMain.handle('launch:export',async()=>{
 let uiLang='ar';
 ipcMain.on('ui:language',(e,l)=>{uiLang=l==='en'?'en':'ar';});
 /* ---------- Update feature: checks public GitHub Releases, no token ---------- */
-const UPD_REPO='basem-sadoun/Bplus';
+const UPD_REPO='basem-sadoun/Bplus-media-player';
 function cmpVer(a,b){const p=s=>String(s||'').replace(/^v/i,'').split('.').map(n=>parseInt(n,10)||0);const x=p(a),y=p(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]-y[i]}return 0}
 async function fetchLatestRelease(){
  const ua={'User-Agent':'Bplus-Player'};
