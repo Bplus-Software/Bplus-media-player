@@ -155,8 +155,8 @@ const FAMILIES={
 }},
 };
 const LABELS={
- 'phosphor':{ar:'فوسفور (افتراضي)',en:'Phosphor (default)'},
- 'phosphor-fill':{ar:'فوسفور معبأ',en:'Phosphor Fill'},
+ 'phosphor':{ar:'فوسفور',en:'Phosphor'},
+ 'phosphor-fill':{ar:'فوسفور معبأ (افتراضي)',en:'Phosphor Fill (default)'},
  'phosphor-duotone':{ar:'فوسفور ثنائي',en:'Phosphor Duotone'},
  'lucide':{ar:'لوسايد',en:'Lucide'},
  'material':{ar:'ماتيريال مدوّر',en:'Material Rounded'}
