@@ -103,6 +103,7 @@
    const cardOf=(keys)=>{const card=document.createElement('div');card.className='settings-card';keys.forEach(k=>card.append(row(k)));content.append(card)};
    sect(ar?'الواجهة':'Interface');
    cardOf(['iconStyle','playlist','theme','shade','opacity']);
+   {let p=document.createElement('p');p.className='settings-info';p.textContent=prefs.language==='ar'?'العتامة تؤثر على النافذة كلها بما فيها الفيديو. اختيار «حسب Windows» يتابع تغيير سمة النظام تلقائيًا.':'Opacity affects the whole window, including video. Follow Windows updates with the system theme.';content.append(p)}
    renderPalette();
    sect(ar?'عرض الصوتيات':'Visualizer');
    cardOf(['vizStyle','vizSize']);
@@ -125,7 +126,6 @@
   }
   if(active==='audio')note(prefs.language==='ar'?'التضخيم فوق 100% قد يسبب تشويشًا. اخفضه إذا حدث ذلك. المعادل بثلاثة نطاقات.':'Boost above 100% may distort. Reduce it if needed. Three-band equalizer.');
   if(active==='video')note(prefs.language==='ar'?'التعديلات تؤثر على العرض فقط، ولا تغيّر الملف الأصلي.':'Display effects do not change the original file.');
-  if(active==='appearance')note(prefs.language==='ar'?'العتامة تؤثر على النافذة كلها بما فيها الفيديو. اختيار «حسب Windows» يتابع تغيير سمة النظام تلقائيًا.':'Opacity affects the whole window, including video. Follow Windows updates with the system theme.');
   if(active==='shortcuts')note(prefs.language==='ar'?'يمكن تغيير 16 اختصارًا أدناه. تظل Ctrl+O لفتح الملفات وCtrl+L للترجمة وCtrl+P للقائمة وF11 لملء الشاشة ثابتة. اختر مفتاحًا مختلفًا لكل إجراء.':'Customize 16 actions below. Ctrl+O: open, Ctrl+L: subtitles, Ctrl+P: playlist and F11: fullscreen remain fixed. Use a different key for each action.');
   if(active==='language'){let select=document.createElement('select');select.innerHTML='<option value="ar">العربية</option><option value="en">English</option>';select.value=prefs.language;select.onchange=()=>{prefs.language=select.value;save();render();translateChrome()};content.append(select);note('العربية / English. Settings, menus and button tooltips follow this choice.');}
   if(active==='files'){
