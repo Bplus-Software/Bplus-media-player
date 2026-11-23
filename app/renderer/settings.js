@@ -44,9 +44,9 @@
     root.setProperty('--text-faint',dark?'#8a8a8a':'#555962');
     root.setProperty('--border',dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.1)');
     root.setProperty('--hover',dark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)');
-    if(prefs.shade<=2){ // lightest end: pure white everywhere, no divider between video area and controls
+    if(prefs.shade<=2){ // lightest end: pure white surfaces, with a visible divider line between video and controls
       ['--bg','--chrome','--chrome-2','--video-bg','--panel','--panel-head','--panel-nav'].forEach(v=>root.setProperty(v,'#ffffff'));
-      root.setProperty('--border','transparent');
+      root.setProperty('--border','#cfd2d8'); // visible divider between video area and controls
     }
   } else shadeVars.forEach(v=>root.removeProperty(v));
   document.documentElement.dataset.theme=theme;BPLUS_ICONS.apply(prefs.iconStyle);window.bplus.setOpacity(prefs.opacity/100);
@@ -95,10 +95,18 @@
  }
  function render(){overlay.dir=prefs.language==='ar'?'rtl':'ltr';overlay.querySelector('#settings-title').textContent=t('title');overlay.querySelector('#settings-note').textContent=t('note');overlay.querySelector('#settings-reset').textContent=t('reset');overlay.querySelector('#settings-done').textContent=t('done');
   nav.replaceChildren();Object.keys(labels.ar).filter(k=>['video','audio','playback','subtitles','appearance','language','shortcuts','files','updates','about'].includes(k)).forEach(key=>{let b=document.createElement('button');{let sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.dataset.ic=key==='audio'?'volume':'nav-'+key;b.append(sv)}b.append(document.createTextNode(t(key)));b.className=active===key?'active':'';b.onclick=()=>{active=key;prefs.lastSection=key;save();render()};nav.append(b)});BPLUS_ICONS.hydrate(nav);content.replaceChildren();let h=document.createElement('h2');h.textContent=t(active);content.append(h);
-  const secDesc={video:['تعديل مظهر الصورة أثناء العرض دون تغيير الملف.','Adjust the picture during playback; the file is unchanged.'],audio:['مستوى الصوت والمعادل.','Volume and equalizer.'],playback:['التشغيل التلقائي والتكرار وخطوة التقديم.','Autoplay, repeat and seek behavior.'],subtitles:['مظهر الترجمة وتوقيتها.','Subtitle appearance and timing.'],appearance:['اللون وعرض الصوتيات والسمة وعتامة النافذة.','Color, audio visualization, theme and window opacity.'],shortcuts:['تخصيص اختصارات لوحة المفاتيح.','Customize keyboard shortcuts.'],language:['لغة واجهة البرنامج.','App interface language.'],files:['أنواع الملفات المدعومة والملفات المؤقتة.','Supported file types and temporary files.'],updates:['تنزيل التحديثات وتثبيتها مع الحفاظ على إعداداتك.','Download and install updates while keeping your settings.'],about:['معلومات البرنامج والمطور.','App and developer information.']};
+  const secDesc={video:['تعديل مظهر الصورة أثناء العرض دون تغيير الملف.','Adjust the picture during playback; the file is unchanged.'],audio:['مستوى الصوت والمعادل.','Volume and equalizer.'],playback:['التشغيل التلقائي والتكرار وخطوة التقديم.','Autoplay, repeat and seek behavior.'],subtitles:['مظهر الترجمة وتوقيتها.','Subtitle appearance and timing.'],appearance:['إعدادات الواجهة وعرض الصوتيات.','Interface settings and the audio visualizer.'],shortcuts:['تخصيص اختصارات لوحة المفاتيح.','Customize keyboard shortcuts.'],language:['لغة واجهة البرنامج.','App interface language.'],files:['أنواع الملفات المدعومة والملفات المؤقتة.','Supported file types and temporary files.'],updates:['تنزيل التحديثات وتثبيتها مع الحفاظ على إعداداتك.','Download and install updates while keeping your settings.'],about:['معلومات البرنامج والمطور.','App and developer information.']};
   if(secDesc[active]){let d=document.createElement('p');d.className='sec-desc';d.textContent=secDesc[active][prefs.language==='ar'?0:1];content.append(d)}
-  if(groups[active]){const card=document.createElement('div');card.className='settings-card';groups[active].filter(k=>k!=='accent').forEach(k=>card.append(row(k)));content.append(card)}
-  if(active==='appearance')renderPalette();
+  if(active==='appearance'){
+   const ar=prefs.language==='ar';
+   const sect=(txt)=>{const h=document.createElement('h3');h.className='sub-title';h.textContent=txt;content.append(h)};
+   const cardOf=(keys)=>{const card=document.createElement('div');card.className='settings-card';keys.forEach(k=>card.append(row(k)));content.append(card)};
+   sect(ar?'الواجهة':'Interface');
+   cardOf(['iconStyle','playlist','theme','shade','opacity']);
+   renderPalette();
+   sect(ar?'عرض الصوتيات':'Visualizer');
+   cardOf(['vizStyle','vizSize']);
+  } else if(groups[active]){const card=document.createElement('div');card.className='settings-card';groups[active].filter(k=>k!=='accent').forEach(k=>card.append(row(k)));content.append(card)}
   const note=(text)=>{let p=document.createElement('p');p.className='settings-info';p.textContent=text;content.append(p)};
   if(active==='subtitles'){
    const en=prefs.language==='en';
@@ -163,7 +171,7 @@
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.2');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.3');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}

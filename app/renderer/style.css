@@ -271,3 +271,7 @@ html:fullscreen body.fs-pure.fs-peek #video-wrap { cursor: default; }
 
 :root[data-theme=light] #seek-track,:root[data-theme=light] #vol-track {background:rgba(0,0,0,.18)}
 :root[data-theme=light] #pl-count {background:rgba(0,0,0,.08)}
+
+.sub-title{font-size:13px;font-weight:700;color:var(--accent-light,var(--text));letter-spacing:.3px;margin:22px 0 10px;padding-bottom:7px;border-bottom:1px solid var(--border)}
+.sub-title:first-of-type{margin-top:6px}
+:root[data-theme=light] .sub-title{color:var(--text)}
