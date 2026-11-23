@@ -90,18 +90,17 @@ let updDownloading=false;
 async function downloadUpdate(info){
  if(updDownloading)return{status:'busy'};
  updDownloading=true;
+ const lp=path.join(app.getPath('userData'),'update-check.log');
+ const log=(s)=>{try{fs.appendFileSync(lp,new Date().toISOString()+' [download] '+s+'\n')}catch(e){}};
  try{
-  const r=await (async(u,o)=>{try{return await require('electron').net.fetch(u,o)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(u,o);throw e}})(info.asset.url,{headers:{'User-Agent':'Bplus-Player'}});
-  if(!r.ok||!r.body){updDownloading=false;return{status:'error',code:r.status}}
+  const nfetch=async(u,o)=>{try{return await require('electron').net.fetch(u,o)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(u,o);throw e}};
   const dest=path.join(app.getPath('temp'),info.asset.name);
-  const total=Number(r.headers.get('content-length'))||info.asset.size||0;
-  const out=fs.createWriteStream(dest);
-  const reader=r.body.getReader();let received=0;
-  for(;;){const{done,value}=await reader.read();if(done)break;received+=value.length;if(!out.write(value))await new Promise(res=>out.once('drain',res));send('update:progress',{received,total});}
-  await new Promise((res,rej)=>out.end(err=>err?rej(err):res));
+  log('start '+info.asset.url);
+  const res=await require('./updater-dl').downloadResumable({fetchFn:nfetch,url:info.asset.url,dest,expectedSize:info.asset.size||0,headers:{'User-Agent':'Bplus-Player'},onProgress:p=>send('update:progress',p),onLog:log});
+  log('done '+res.size+' bytes');
   updDownloading=false;
   return{status:'done',path:dest};
- }catch(err){updDownloading=false;return{status:'error',message:String(err&&err.message||err)}}
+ }catch(err){updDownloading=false;const msg=String(err&&err.message||err);log('FAILED '+msg);return{status:'error',message:msg,logPath:lp}}
 }
 ipcMain.handle('update:download',async(e,info)=>downloadUpdate(info));
 ipcMain.handle('update:open-page',()=>shell.openExternal('https://github.com/'+UPD_REPO+'/releases/latest'));

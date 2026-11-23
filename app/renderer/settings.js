@@ -154,9 +154,17 @@
     if(r&&r.status==='available'){status.textContent=(en?'A new version is available: B+ ':'يتوفر إصدار جديد: B+ ')+r.version;
      dlBtn=document.createElement('button');dlBtn.className='settings-action';dlBtn.id='upd-download';dlBtn.textContent=en?'Download and install':'تنزيل وتثبيت';
      dlBtn.onclick=async()=>{dlBtn.disabled=true;prog.hidden=false;prog.firstElementChild.style.width='0%';
-      const d=await window.bplus.updateDownload(r);
+      if(errBox){errBox.remove();errBox=null}
+      status.textContent=en?'Downloading... 0%':'جارٍ التنزيل... 0%';
+      let d;try{d=await window.bplus.updateDownload(r)}catch(e){d={status:'error',message:String(e&&e.message||e)}}
       if(d&&d.status==='done'){status.textContent=en?'Download complete. The app will restart to install.':'اكتمل التنزيل. سيعاد تشغيل البرنامج للتثبيت.';await window.bplus.updateInstall(d.path);}
-      else{status.textContent=en?'Download failed. Check your internet connection and try again.':'فشل التنزيل. تحقق من اتصال الإنترنت وحاول مجددًا.';dlBtn.disabled=false;prog.hidden=true;}};
+      else{status.textContent=(en?'Download failed. ':'فشل التنزيل. ')+(d&&d.message?String(d.message):'')+' '+(en?'Press the button to resume where it stopped.':'اضغط الزر للاستكمال من حيث توقف.');dlBtn.textContent=en?'Resume download':'استكمال التنزيل';dlBtn.disabled=false;prog.hidden=true;
+       errBox=document.createElement('div');
+       let pg=document.createElement('button');pg.className='settings-action';pg.textContent=en?'Open releases page':'فتح صفحة التحديثات';pg.onclick=()=>window.bplus.updateOpenPage();
+       let cp=document.createElement('button');cp.className='settings-action';cp.textContent=en?'Copy details':'نسخ التفاصيل';cp.onclick=async()=>{try{await navigator.clipboard.writeText(String((d&&d.message)||'no-details'));cp.textContent=en?'Copied':'تم النسخ';setTimeout(()=>{cp.textContent=en?'Copy details':'نسخ التفاصيل'},1500)}catch(e){}};
+       errBox.append(pg,cp);
+       if(d&&d.logPath){let lp=document.createElement('p');lp.className='settings-info';lp.textContent=(en?'Details saved to: ':'سُجلت التفاصيل في: ')+d.logPath;errBox.append(lp);}
+       content.append(errBox);}};
      content.append(dlBtn);}
     else if(r&&r.status==='latest')status.textContent=(en?'You are on the latest version (B+ ':'أنت على أحدث إصدار (B+ ')+r.version+').';
     else if(r&&r.status==='none')status.textContent=en?'No updates published yet. You are on the latest version.':'لا توجد تحديثات منشورة بعد. أنت على أحدث إصدار.';
@@ -171,7 +179,7 @@
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.3');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.4');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}
@@ -203,6 +211,7 @@ const actions={shortcutPlay:togglePlay,shortcutSubEarlier:()=>subBump(-0.5),shor
  let updOsdT=0;
  window.bplus.onUpdateProgress(p=>{const el=document.getElementById('upd-progress');const pct=p&&p.total?Math.min(100,Math.round(p.received/p.total*100)):0;
   if(el){el.hidden=false;if(el.firstElementChild)el.firstElementChild.style.width=pct+'%'}
+  const st=document.getElementById('upd-status');if(st&&p&&p.total){const mb=x=>(x/1048576).toFixed(1);const en2=prefs.language==='en';st.textContent=(en2?'Downloading... ':'جارٍ التنزيل... ')+pct+'% ('+mb(p.received)+' / '+mb(p.total)+' MB)'+(p.attempt>1?(en2?' - resumed':' - تم الاستئناف'):'')}
   else{const now=Date.now();if(now-updOsdT>900){updOsdT=now;showOsd((prefs.language==='en'?'Downloading update... ':'جارٍ تنزيل التحديث... ')+pct+'%')}}});
  window.bplus.appVersion().then(v=>{window.BPLUS_APP_VERSION=v});
  setTimeout(async()=>{try{if(prefs.updateAuto===false)return;const r=await window.bplus.updateCheck();if(r&&r.status==='available')window.bplus.updatePrompt(r)}catch(e){}},7000);
