@@ -38,7 +38,7 @@ ipcMain.on('ui:language',(e,l)=>{uiLang=l==='en'?'en':'ar';});
 /* ---------- Update feature: checks public GitHub Releases, no token ---------- */
 const UPD_REPO='basem-sadoun/Bplus-media-player';
 function cmpVer(a,b){const p=s=>String(s||'').replace(/^v/i,'').split('.').map(n=>parseInt(n,10)||0);const x=p(a),y=p(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]-y[i]}return 0}
-async function fetchLatestRelease(){
+async function fetchLatestRelease(pre){
  const ua={'User-Agent':'Bplus-Player'};
  // Chromium stack first (system proxy + cert store); if the session blocks it, fall back to Node's own fetch.
  const nf=()=>async(url,opt)=>{try{return await require('electron').net.fetch(url,opt)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(url,opt);throw e}};
@@ -47,6 +47,13 @@ async function fetchLatestRelease(){
   return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+tag+'/Bplus-'+ver+'-Setup.exe',size:0}};};
  // Electron's net.fetch uses the Chromium network stack: the Windows system
  // proxy and the Windows certificate store apply automatically.
+ // 0) Preview versions wanted: newest non-draft release (prereleases included) that carries an .exe.
+ if(pre){try{
+  const rp=await nf()('https://api.github.com/repos/'+UPD_REPO+'/releases?per_page=30',{headers:ua,signal:T()});
+  if(rp.ok){const list=await rp.json();let best=null;
+   for(const j of list||[]){if(j.draft)continue;const asset=(j.assets||[]).find(a=>/^Bplus-.*-Setup\.exe$/i.test(a.name));if(!asset)continue;const v=String(j.tag_name||'').replace(/^v/i,'');if(!best||cmpVer(v,best.version)>0)best={status:'ok',version:v,name:j.name||'',notes:j.body||'',asset:{name:asset.name,url:asset.browser_download_url,size:asset.size}}}
+   if(best)return best}
+ }catch(e){}}
  // 1) GitHub API: exact JSON with the asset list.
  try{
   const r=await nf()('https://api.github.com/repos/'+UPD_REPO+'/releases/latest',{headers:ua,signal:T()});
@@ -77,9 +84,9 @@ async function fetchLatestRelease(){
  }catch(e){lastErr+=' | github.com: '+String(e&&e.message||e)}
  return{status:'error',message:lastErr};
 }
-ipcMain.handle('update:check',async()=>{
+ipcMain.handle('update:check',async(e,pre)=>{
  try{
-  const rel=await fetchLatestRelease();
+  const rel=await fetchLatestRelease(!!pre);
   if(rel.status==='none')return{status:'none'};
   if(rel.status==='error'){const lp=path.join(app.getPath('userData'),'update-check.log');try{fs.appendFileSync(lp,new Date().toISOString()+' '+(rel.message||'unknown')+'\n')}catch(e){}return{status:'error',message:rel.message,logPath:lp};}
   if(!rel.asset)return{status:'error',message:'no-asset'};

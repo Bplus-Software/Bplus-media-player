@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('bplus', {
   trashItem:(p)=>ipcRenderer.invoke('media:trash',p),
   setUILanguage:(l)=>ipcRenderer.send('ui:language',l),
   appVersion:()=>ipcRenderer.invoke('app:version'),
-  updateCheck:()=>ipcRenderer.invoke('update:check'),
+  updateCheck:(pre)=>ipcRenderer.invoke('update:check',!!pre),
   updateDownload:(info)=>ipcRenderer.invoke('update:download',info),
   updateInstall:(p)=>ipcRenderer.invoke('update:install',p),
   updatePrompt:(info)=>ipcRenderer.invoke('update:prompt',info),
