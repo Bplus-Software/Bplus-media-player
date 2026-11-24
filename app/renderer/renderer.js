@@ -138,10 +138,10 @@ async function trashAt(i) {
   const en = window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.prefs.language === 'en';
   hidePops();
   const r = await window.bplus.confirmDialog({
-    title: en ? 'Delete file' : 'حذف الملف',
-    message: en ? `Move "${item.name}" to the Recycle Bin?` : `نقل "${item.name}" إلى سلة المحذوفات؟`,
-    detail: en ? 'You can restore it from the Recycle Bin later.' : 'يمكنك استعادته لاحقًا من سلة المحذوفات.',
-    buttons: en ? ['Move to Recycle Bin', 'Cancel'] : ['نقل إلى سلة المحذوفات', 'إلغاء']
+    title: en ? BPLUS_I18N.tr('Delete file') : 'حذف الملف',
+    message: en ? BPLUS_I18N.tr('Move "{0}" to the Recycle Bin?').replace('{0}', item.name) : `نقل "${item.name}" إلى سلة المحذوفات؟`,
+    detail: en ? BPLUS_I18N.tr('You can restore it from the Recycle Bin later.') : 'يمكنك استعادته لاحقًا من سلة المحذوفات.',
+    buttons: en ? [BPLUS_I18N.tr('Move to Recycle Bin'), BPLUS_I18N.tr('Cancel')] : ['نقل إلى سلة المحذوفات', 'إلغاء']
   });
   if (r !== 0) return;
   const res = await window.bplus.trashItem(item.path);

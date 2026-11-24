@@ -20,7 +20,7 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-  font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; font-size: 14px; user-select: none; }
+  font-family: 'Cairo', 'Segoe UI', 'Nirmala UI', 'Microsoft YaHei UI', 'Microsoft YaHei', Tahoma, 'Noto Sans', 'Noto Sans CJK SC', sans-serif; font-size: 14px; user-select: none; }
 #app { display: flex; flex-direction: column; height: 100%; }
 button { font-family: inherit; }
 .win-btn svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
