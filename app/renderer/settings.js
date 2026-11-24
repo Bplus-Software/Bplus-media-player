@@ -4,6 +4,7 @@
  const keyChoices=['Space','Enter','f','m','p','k','s','t','c',',','n','b','v','PageDown','PageUp','ArrowRight','ArrowLeft','ArrowUp','ArrowDown'];
  let stored={};try{stored=JSON.parse(localStorage.getItem('bplus-prefs')||'{}')||{}}catch{}
  let prefs={...defaults,...stored};
+ if(!['ar','en'].includes(stored.language)){const sys=String((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();prefs.language=sys.startsWith('ar')?'ar':'en'} // first run: follow the Windows display language (Arabic, else English); a saved choice always wins
  if(!['ar','en'].includes(prefs.language))prefs.language='ar';
  if(!['dark','light','system'].includes(prefs.theme))prefs.theme=defaults.theme;
  prefs.iconStyle={outline:'phosphor',bold:'phosphor',chips:'phosphor-fill',duo:'phosphor-duotone'}[prefs.iconStyle]||prefs.iconStyle;if(!BPLUS_ICONS.FAMILIES[prefs.iconStyle])prefs.iconStyle='phosphor';
