@@ -176,16 +176,16 @@ const prep=document.createElement('div');prep.id='media-preparation';prep.hidden
 prep.querySelector('button').onclick=()=>{playbackSerial++;window.bplus.cancelPreparation();prep.hidden=true;};
 window.bplus.onPreparation(info=>{if(info.state==='idle'){prep.hidden=true;return}prep.hidden=false;prep.querySelector('strong').textContent=window.bplusPrefs?.language==='en'?'Preparing for playback locally':'تجهيز الملف للتشغيل على جهازك';prep.querySelector('span').textContent=info.name+' · '+fmt(info.seconds||0);});
 function mediaFailure(code){const en=window.bplusPrefs?.language==='en';const messages={ENGINE_MISSING:en?'Offline decoder is missing. Reinstall B+.':'محرك التشغيل غير موجود. أعد تثبيت B+.',DISK_FULL:en?'Not enough free disk space for preparation.':'المساحة غير كافية لتجهيز الملف.',NO_READABLE_STREAM:en?'No readable media stream. The file may be damaged or protected.':'تعذر قراءة الوسائط. قد يكون الملف تالفًا أو محميًا.',CONVERSION_FAILED:en?'This file could not be prepared. The codec may be unsupported, damaged or protected.':'تعذر تجهيز الملف. قد يكون الترميز غير مدعوم أو الملف تالفًا أو محميًا.'};return messages[code]||(en?'Could not open this media file.':'تعذر فتح ملف الوسائط.');}
-async function playAt(i, forcePlay=false) {
+async function playAt(i, forcePlay=false, noPlay=false) {
   if (i < 0 || i >= playlist.length) return;
   savePosition();const serial=++playbackSerial;
   if(typeof setOffArmed==='function'){cancelOff();setOffArmed(false);}
   current = i;const item = playlist[i];
   player.pause();player.removeAttribute('src');player.load();audioViz.hidden=true;
   activeResumeKey=null;
-  const key=resumeKey(item.path);const resume=resumePositions[key]?.time||0;
+  const key=resumeKey(item.path);const resume=window.bplusPrefs?.resumeOn===false?0:(resumePositions[key]?.time||0);
   titleLabel.textContent = item.name;tbTitle.textContent = item.name + '  |  B+ Media Player';
-  dropHint.classList.add('hidden');renderPlaylist();if(window.BPLUS_RECENT)window.BPLUS_RECENT.add(item);
+  dropHint.classList.add('hidden');renderPlaylist();if(window.BPLUS_RECENT)window.BPLUS_RECENT.add(item);try{localStorage.setItem('bplus-last',JSON.stringify({path:item.path,name:item.name}))}catch{}
   async function loadPrepared(result){
    if(serial!==playbackSerial)return;
    activeResumeKey=key;
@@ -194,7 +194,7 @@ async function playAt(i, forcePlay=false) {
    },{once:true});
    await new Promise((resolve,reject)=>{let timer;const clean=()=>{clearTimeout(timer);player.removeEventListener('loadedmetadata',ready);player.removeEventListener('error',failed)};const ready=()=>{clean();resolve()};const failed=()=>{clean();reject(Error('DECODE_FAILED'))};player.addEventListener('loadedmetadata',ready);player.addEventListener('error',failed);timer=setTimeout(failed,20000);player.src=result.url;});
    if(serial!==playbackSerial)return;
-   if(forcePlay||window.bplusPrefs?.autoplay!==false)await player.play();
+   if(!noPlay&&(forcePlay||window.bplusPrefs?.autoplay!==false))await player.play();
   }
   try{
    let result;
@@ -298,8 +298,22 @@ function clearSubtitle() {
   bSubVis.className = 'ctl txt off';
 }
 
+let curSub = null;
+function shiftSubText(text, d) {
+  const f = (h, m, s, ms, sep) => { let t = Math.max(0, ((+h || 0) * 3600 + (+m) * 60 + (+s)) * 1000 + (+ms.padEnd(3, '0')) + Math.round(d * 1000)); const H = Math.floor(t / 3600000), M = Math.floor(t / 60000) % 60, S = Math.floor(t / 1000) % 60, X = t % 1000; const p2 = (n) => String(n).padStart(2, '0'); return (H || h ? p2(H) + ':' : '') + p2(M) + ':' + p2(S) + sep + String(X).padStart(3, '0'); };
+  return text.replace(/(?:(\d{1,2}):)?(\d{2}):(\d{2})([,.])(\d{1,3})\s*-->\s*(?:(\d{1,2}):)?(\d{2}):(\d{2})([,.])(\d{1,3})/g, (all, h1, m1, s1, sp1, ms1, h2, m2, s2, sp2, ms2) => f(h1, m1, s1, ms1, sp1) + ' --> ' + f(h2, m2, s2, ms2, sp2));
+}
+window.BPLUS_SUBSAVE = async () => {
+  const P = window.bplusPrefs;
+  if (!P || !P.subSaveShifted || !curSub || !curSub.path) return;
+  const d = Number(P.subDelay) || 0;
+  if (d === 0) return;
+  const name = await window.bplus.saveShiftedSubtitle(curSub.path, shiftSubText(curSub.content, d));
+  if (name) showOsd(L('تم حفظ الترجمة: ', 'Saved subtitles: ') + name);
+};
 function setSubtitle(sub, silent) {
   clearSubtitle();
+  curSub = sub;
   let content = sub.content;
   if (sub.name.toLowerCase().endsWith('.srt') || !/^\s*WEBVTT/.test(content)) {
     content = srtToVtt(content);
@@ -743,15 +757,30 @@ const tipTime = seekTip.querySelector('.tip-time');
 const thumbVideo = document.createElement('video');
 thumbVideo.muted = true; thumbVideo.preload = 'auto'; thumbVideo.style.display = 'none';
 document.body.append(thumbVideo);
-let tipTimer = 0, tipPending = -1;
-player.addEventListener('loadedmetadata', () => {
-  const src = player.currentSrc || player.getAttribute('src') || '';
-  if (player.videoWidth > 0 && src && src !== thumbVideo.getAttribute('src')) thumbVideo.src = src;
-  if (player.videoWidth === 0) { thumbVideo.removeAttribute('src'); thumbVideo.load(); hideSeekTip(); }
-});
-function hideSeekTip() { seekTip.hidden = true; tipPending = -1; clearTimeout(tipTimer); }
+let tipTimer = 0, tipPending = -1, thumbSrc = '', thumbIdle = 0, thumbBusy = false, thumbQueued = -1;
+thumbVideo.preload = 'metadata';
+function thumbWantedSrc() { return player.videoWidth > 0 ? (player.currentSrc || player.getAttribute('src') || '') : ''; }
+function thumbAttach() {
+  clearTimeout(thumbIdle);
+  const src = thumbWantedSrc();
+  if (!src) return false;
+  if (thumbSrc !== src) { thumbSrc = src; thumbBusy = false; thumbQueued = -1; thumbVideo.src = src; }
+  return true;
+}
+// free the second decoder shortly after the mouse leaves the bar
+function thumbDetach() {
+  clearTimeout(thumbIdle);
+  thumbIdle = setTimeout(() => { thumbSrc = ''; thumbBusy = false; thumbQueued = -1; thumbVideo.removeAttribute('src'); thumbVideo.load(); }, 1500);
+}
+player.addEventListener('loadedmetadata', () => { thumbSrc = ''; thumbVideo.removeAttribute('src'); thumbVideo.load(); hideSeekTip(); });
+function hideSeekTip() { seekTip.hidden = true; tipPending = -1; thumbQueued = -1; clearTimeout(tipTimer); }
+function thumbSeekTo(t) {
+  if (thumbBusy) { thumbQueued = t; return; }   // never stack seeks on the second decoder
+  thumbBusy = true;
+  try { thumbVideo.currentTime = t; } catch (e2) { thumbBusy = false; }
+}
 seek.addEventListener('mousemove', (e) => {
-  if (!window.bplusPrefs || !window.bplusPrefs.thumbPreview || player.videoWidth === 0 || !isFinite(player.duration) || !thumbVideo.getAttribute('src')) { hideSeekTip(); return; }
+  if (!window.bplusPrefs || !window.bplusPrefs.thumbPreview || player.videoWidth === 0 || !isFinite(player.duration) || !thumbAttach()) { hideSeekTip(); return; }
   const r = seek.getBoundingClientRect();
   const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
   tipPending = frac * player.duration;
@@ -760,17 +789,21 @@ seek.addEventListener('mousemove', (e) => {
   seekTip.hidden = false;
   tipTime.textContent = fmt(tipPending) + ' / ' + fmt(player.duration);
   clearTimeout(tipTimer);
-  tipTimer = setTimeout(() => { try { thumbVideo.currentTime = tipPending; } catch (e2) {} }, 130);
+  tipTimer = setTimeout(() => thumbSeekTo(tipPending), 160);
 });
 thumbVideo.addEventListener('seeked', () => {
-  if (seekTip.hidden || tipPending < 0) return;
+  thumbBusy = false;
+  if (seekTip.hidden || tipPending < 0) { thumbQueued = -1; return; }
   const vw = thumbVideo.videoWidth, vh = thumbVideo.videoHeight;
-  if (!vw || !vh) return;
-  const scale = Math.max(tipCanvas.width / vw, tipCanvas.height / vh);
-  const dw = vw * scale, dh = vh * scale;
-  tipCtx.drawImage(thumbVideo, (tipCanvas.width - dw) / 2, (tipCanvas.height - dh) / 2, dw, dh);
+  if (vw && vh) {
+    const scale = Math.max(tipCanvas.width / vw, tipCanvas.height / vh);
+    const dw = vw * scale, dh = vh * scale;
+    tipCtx.drawImage(thumbVideo, (tipCanvas.width - dw) / 2, (tipCanvas.height - dh) / 2, dw, dh);
+  }
+  if (thumbQueued >= 0) { const q = thumbQueued; thumbQueued = -1; thumbSeekTo(q); }
 });
-seek.addEventListener('mouseleave', hideSeekTip);
+thumbVideo.addEventListener('error', () => { thumbBusy = false; thumbQueued = -1; });
+seek.addEventListener('mouseleave', () => { hideSeekTip(); thumbDetach(); });
 player.addEventListener('durationchange', () => { tDur.textContent = fmt(player.duration); updateSeekUI(); });
 player.addEventListener('progress', () => {
   try {
@@ -840,6 +873,17 @@ $('tb-pin').onclick = async () => {
 };
 $('tb-open').onclick = () => window.bplus.openFiles();
 $('tb-recent').onclick = (ev) => { ev.stopPropagation(); if (window.BPLUS_RECENT) window.BPLUS_RECENT.menu($('tb-recent')); };
+{
+  // hover: open the recent list under the button, close it when the mouse leaves both
+  let tOpen = 0, tClose = 0, viaHover = false;
+  const btn = $('tb-recent');
+  const closeSoon = () => { clearTimeout(tOpen); clearTimeout(tClose); tClose = setTimeout(() => { if (viaHover) { hidePops(); viaHover = false; } }, 260); };
+  btn.addEventListener('mouseenter', () => { clearTimeout(tClose); clearTimeout(tOpen); if (!menuPop.hidden) return; tOpen = setTimeout(() => { if (window.BPLUS_RECENT) { viaHover = true; window.BPLUS_RECENT.menu(btn); } }, 150); });
+  btn.addEventListener('mouseleave', closeSoon);
+  menuPop.addEventListener('mouseenter', () => clearTimeout(tClose));
+  menuPop.addEventListener('mouseleave', closeSoon);
+  btn.addEventListener('click', () => { viaHover = false; });
+}
 $('pl-add').onclick = () => window.bplus.openFiles();
 $('pl-clear').onclick = () => { playbackSerial++;window.bplus.cancelPreparation();prep.hidden=true;audioViz.hidden=true;savePosition();activeResumeKey=null;playlist = []; current = -1; player.removeAttribute('src'); player.load(); setPlayingUI(false); titleLabel.textContent = ''; tbTitle.textContent = ''; renderPlaylist(); };
 
@@ -879,6 +923,7 @@ function popItem(container, label, shortcut, fn, opts = {}) {
   }
   d.onclick = (ev) => { ev.stopPropagation(); hidePops(); fn(); };
   container.appendChild(d);
+  return d;
 }
 
 function popSep(container) {
@@ -886,6 +931,38 @@ function popSep(container) {
   hr.className = 'pop-sep';
   container.appendChild(hr);
 }
+
+
+/* ---------- Recent files: hover submenu ---------- */
+const recentSub = $('recent-sub');
+let subOpenT = 0, subCloseT = 0, subItem = null, subGen = 0;
+function closeRecentSub(now) {
+  clearTimeout(subOpenT); clearTimeout(subCloseT); subGen++;
+  const go = () => { recentSub.hidden = true; recentSub.replaceChildren(); if (subItem) subItem.classList.remove('sub-open'); subItem = null; };
+  if (now) go(); else subCloseT = setTimeout(go, 220);
+}
+async function openRecentSub(item, kind) {
+  clearTimeout(subCloseT); clearTimeout(subOpenT);
+  const gen = ++subGen;
+  const box = document.createElement('div');
+  recentSub.dir = document.documentElement.dir === 'ltr' ? 'ltr' : 'rtl';
+  if (kind === 'lib') libFill(box); else if (window.BPLUS_RECENT) await window.BPLUS_RECENT.fill(box);
+  if (gen !== subGen || menuPop.hidden) return;
+  recentSub.replaceChildren(...box.childNodes);
+  if (subItem && subItem !== item) subItem.classList.remove('sub-open');
+  subItem = item; item.classList.add('sub-open');
+  recentSub.hidden = false;
+  const mr = menuPop.getBoundingClientRect(), ir = item.getBoundingClientRect();
+  const w = recentSub.offsetWidth, h = recentSub.offsetHeight;
+  const rtl = recentSub.dir === 'rtl';
+  let x = rtl ? mr.left - w + 3 : mr.right - 3;
+  if (x < 4) x = mr.right - 3;
+  if (x + w > innerWidth - 4) x = Math.max(4, mr.left - w + 3);
+  let y = Math.min(ir.top - 5, innerHeight - h - 8);
+  recentSub.style.left = x + 'px'; recentSub.style.top = Math.max(4, y) + 'px';
+}
+recentSub.addEventListener('mouseenter', () => { clearTimeout(subCloseT); });
+recentSub.addEventListener('mouseleave', () => closeRecentSub(false));
 
 function popHead(container, text) {
   const d = document.createElement('div');
@@ -910,6 +987,7 @@ function showPop(container, anchor, buildFn) {
 }
 
 function hidePops() {
+  closeRecentSub(true);
   menuPop.hidden = true;
   ctxMenu.hidden = true;
 }
@@ -919,7 +997,15 @@ $('tb-menu').onclick = (ev) => {
   showPop(menuPop, $('tb-menu'), (c) => {
     popItem(c, L('فتح ملف...', 'Open file...'), 'Ctrl+O', () => window.bplus.openFiles(), { icon: 'm-file' });
     popItem(c, L('فتح مجلد...', 'Open folder...'), 'Ctrl+Shift+O', () => window.bplus.openFolder(), { icon: 'm-folder' });
-    popItem(c, L('الملفات الحديثة...', 'Recent files...'), null, () => setTimeout(() => window.BPLUS_RECENT && window.BPLUS_RECENT.menu($('tb-menu')), 0), { icon: 'recent' });
+    const ri = popItem(c, L('الملفات الحديثة', 'Recent files'), null, () => {}, { icon: 'recent' });
+    const ar = document.createElement('span'); ar.className = 'sub-arrow'; ar.textContent = document.documentElement.dir === 'ltr' ? '\u25B8' : '\u25C2'; ri.appendChild(ar);
+    ri.onclick = (ev) => { ev.stopPropagation(); openRecentSub(ri); };
+    ri.onmouseenter = () => { clearTimeout(subCloseT); clearTimeout(subOpenT); subOpenT = setTimeout(() => openRecentSub(ri), 90); };
+    const li = popItem(c, L('المكتبات', 'Libraries'), null, () => {}, { icon: 'm-list' });
+    const ar2 = document.createElement('span'); ar2.className = 'sub-arrow'; ar2.textContent = ar.textContent; li.appendChild(ar2);
+    li.onclick = (ev) => { ev.stopPropagation(); openRecentSub(li, 'lib'); };
+    li.onmouseenter = () => { clearTimeout(subCloseT); clearTimeout(subOpenT); subOpenT = setTimeout(() => openRecentSub(li, 'lib'), 90); };
+    c.onmouseover = (ev) => { const it = ev.target.closest && ev.target.closest('.pop-item'); if (it && it !== ri && it !== li && subItem) closeRecentSub(false); else if (it && it !== ri && it !== li) clearTimeout(subOpenT); };
     popSep(c);
     popItem(c, L('تحميل ملف ترجمة...', 'Load subtitles...'), 'Ctrl+L', () => window.bplus.openSubtitleDialog(), { icon: 'm-sub' });
     popItem(c, L('إظهار / إخفاء الترجمة', 'Show / hide subtitles'), 'Ctrl+T', toggleSubtitleVisible, { icon: 'm-eye' });
@@ -1098,7 +1184,15 @@ async function receiveExternal(payload){
  await playAt(ex?ex.index:0,true);if(payload.id)window.bplus.acknowledgeLaunch(payload.id);
 }
 window.bplus.onExternalMedia(receiveExternal);
-window.addEventListener('DOMContentLoaded',async()=>{try{await receiveExternal(await window.bplus.pullLaunch())}catch(e){showOsd(L('تعذر فتح الملف: ','Could not open the file: ')+iso(e.message))}});
+window.addEventListener('DOMContentLoaded',async()=>{try{await receiveExternal(await window.bplus.pullLaunch())}catch(e){showOsd(L('تعذر فتح الملف: ','Could not open the file: ')+iso(e.message))}
+  // optional: reopen the last played file, paused, when B+ starts without a file
+  try{
+    if(window.bplusPrefs?.lastOpenOn&&playlist.length===0){
+      const last=JSON.parse(localStorage.getItem('bplus-last')||'null');
+      if(last&&last.path){const [e]=await window.bplus.entriesForPaths([last.path]);if(e&&e.size!==undefined&&playlist.length===0){playlist.push(e);renderPlaylist();playAt(0,false,true)}}
+    }
+  }catch{}
+});
 
 
 /* ---------- Toggled-on buttons use the accent color ---------- */
@@ -1115,3 +1209,158 @@ window.addEventListener('DOMContentLoaded',async()=>{try{await receiveExternal(a
   setInterval(sync, 250);
   sync();
 })();
+
+/* ---------- Bottom bar: keep the centered file name clear of the time and the buttons ---------- */
+function fitTitleLabel() {
+  const row = $('btn-row'), lab = titleLabel, left = $('times'), right = $('b-subvis');
+  if (!row || !lab) return;
+  lab.classList.remove('fit-hide'); lab.style.left = ''; lab.style.maxWidth = 'none';
+  const nat = lab.offsetWidth;
+  const rr = row.getBoundingClientRect(), center = rr.left + rr.width / 2;
+  const l = left.getBoundingClientRect(), r = right.getBoundingClientRect();
+  const sym = 2 * Math.min(center - l.right, r.left - center) - 24;   // room if the name stays at the exact bar center
+  const gap = r.left - l.right - 24;                                    // all free room between the time and SUB
+  if (nat <= sym) { lab.style.maxWidth = ''; return; }                  // fits: exact center, no cutting
+  if (gap < 90) { lab.style.maxWidth = ''; lab.classList.add('fit-hide'); return; }
+  // too long for the exact center: use the whole free space, centered in it; "..." only if it still does not fit
+  lab.style.maxWidth = gap + 'px';
+  lab.style.left = ((l.right + r.left) / 2 - rr.left) + 'px';
+}
+/* Hover on a cut-off file name: scroll it so the whole name shows, then scroll back on leave. */
+(function () {
+  let raf = 0, run = 0;
+  const dirSign = () => (getComputedStyle(titleLabel).direction === 'rtl' ? -1 : 1);
+  function glide(target, ms, done) {
+    cancelAnimationFrame(raf); const from = titleLabel.scrollLeft, t0 = performance.now(), id = ++run;
+    const step = (t) => {
+      if (id !== run) return;
+      const k = Math.min(1, (t - t0) / ms), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      titleLabel.scrollLeft = from + (target - from) * e;
+      if (k < 1) raf = requestAnimationFrame(step); else if (done) done();
+    };
+    raf = requestAnimationFrame(step);
+  }
+  titleLabel.addEventListener('mouseenter', () => {
+    const over = titleLabel.scrollWidth - titleLabel.clientWidth;
+    if (over <= 1) return;
+    titleLabel.classList.add('scrolling');
+    glide(over * dirSign(), Math.max(900, over * 18));
+  });
+  titleLabel.addEventListener('mouseleave', () => {
+    if (!titleLabel.classList.contains('scrolling')) return;
+    glide(0, 450, () => titleLabel.classList.remove('scrolling'));
+  });
+})();
+window.addEventListener('resize', fitTitleLabel);
+new MutationObserver(fitTitleLabel).observe(titleLabel, { childList: true, characterData: true, subtree: true });
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fitTitleLabel).observe($('btn-row'));
+setTimeout(fitTitleLabel, 0);
+
+
+/* ---------- Libraries: named playlists saved by the user ---------- */
+/* A library is a saved snapshot of file paths. Adding a folder copies its current media list; nothing is copied on disk. */
+let libs; try { libs = JSON.parse(localStorage.getItem('bplus-libs') || '[]'); if (!Array.isArray(libs)) libs = []; } catch { libs = []; }
+function libSave() { try { localStorage.setItem('bplus-libs', JSON.stringify(libs)); } catch {} }
+const libSlim = (e) => ({ path: e.path, name: e.name });
+function libAsk(title, value) {
+  return new Promise((resolve) => {
+    const ov = document.createElement('div'); ov.id = 'lib-ask';
+    const box = document.createElement('div'); box.dir = document.documentElement.dir === 'ltr' ? 'ltr' : 'rtl';
+    const h = document.createElement('div'); h.className = 'lib-ask-t'; h.textContent = title;
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 60; inp.value = value || '';
+    const row = document.createElement('div'); row.className = 'lib-ask-b';
+    const ok = document.createElement('button'); ok.textContent = L('حفظ', 'Save'); ok.className = 'primary';
+    const no = document.createElement('button'); no.textContent = L('إلغاء', 'Cancel');
+    row.append(ok, no); box.append(h, inp, row); ov.append(box); document.body.append(ov);
+    const done = (v) => { ov.remove(); resolve(v); };
+    ok.onclick = () => { const v = inp.value.trim(); if (v) done(v); else inp.focus(); };
+    no.onclick = () => done(null);
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) done(null); });
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') ok.onclick(); else if (e.key === 'Escape') done(null); });
+    inp.addEventListener('keyup', (e) => e.stopPropagation());
+    setTimeout(() => { inp.focus(); inp.select(); }, 30);
+  });
+}
+async function libNameFree(name, exceptId) {
+  const dup = libs.find(l => l.id !== exceptId && l.name.toLowerCase() === name.toLowerCase());
+  if (dup) { showOsd(L('يوجد مكتبة بنفس الاسم', 'A library with this name already exists')); return false; }
+  return true;
+}
+async function libNew(items) {
+  const name = await libAsk(L('اسم القائمة الجديدة', 'New list name'), '');
+  if (!name || !(await libNameFree(name))) return;
+  libs.push({ id: 'l' + Date.now().toString(36), name, items: items || [] }); libSave();
+  showOsd(L('تم حفظ المكتبة: ', 'Library saved: ') + name);
+}
+async function libEntries(lib) {
+  const es = await window.bplus.entriesForPaths(lib.items.map(i => i.path));
+  const ok = es.filter(e => e.size !== undefined || !/^[a-z]:[\\/]/i.test(e.path));
+  return { ok, missing: es.length - ok.length };
+}
+async function libOpen(lib, replace) {
+  if (!lib.items.length) { showOsd(L('المكتبة فارغة', 'This library is empty')); return; }
+  const { ok, missing } = await libEntries(lib);
+  if (!ok.length) { showOsd(L('ملفات المكتبة غير موجودة', 'The library files were not found')); return; }
+  if (replace) $('pl-clear').onclick();
+  playlistEl.classList.remove('hidden');
+  addEntries(ok);
+  showOsd((replace ? L('فُتحت: ', 'Opened: ') : L('أُضيفت: ', 'Added: ')) + lib.name + (missing ? L(' (ملفات ناقصة: ', ' (missing files: ') + missing + ')' : ''));
+}
+async function libAddPick(lib, kind) {
+  const es = await window.bplus.pickMedia(kind);
+  if (!es || !es.length) return;
+  const have = new Set(lib.items.map(i => resumeKey(i.path)));
+  const fresh = es.filter(e => !have.has(resumeKey(e.path)));
+  lib.items.push(...fresh.map(libSlim)); libSave();
+  showOsd(L('أُضيف إلى ', 'Added to ') + lib.name + ': ' + fresh.length + (es.length - fresh.length ? L(' (مكرر: ', ' (duplicates: ') + (es.length - fresh.length) + ')' : ''));
+}
+async function libDelete(lib) {
+  const r = await window.bplus.confirmDialog({
+    title: L('حذف المكتبة', 'Delete library'),
+    message: L(`حذف المكتبة "${lib.name}"؟`, `Delete the library "${lib.name}"?`),
+    detail: L('تُحذف القائمة فقط، أما ملفاتك فلا تتأثر.', 'Only the list is removed. Your files are not touched.'),
+    buttons: [L('حذف', 'Delete'), L('إلغاء', 'Cancel')]
+  });
+  if (r !== 0) return;
+  libs = libs.filter(l => l.id !== lib.id); libSave();
+  showOsd(L('تم حذف المكتبة', 'Library deleted'));
+}
+function libActions(lib, rect) {
+  showPop(ctxMenu, { getBoundingClientRect: () => rect }, (c) => {
+    popHead(c, lib.name + '  (' + lib.items.length + ')');
+    popItem(c, L('فتح (يستبدل قائمة التشغيل)', 'Open (replaces playlist)'), null, () => libOpen(lib, true), { icon: 'm-list' });
+    popItem(c, L('إضافة إلى قائمة التشغيل', 'Add to current playlist'), null, () => libOpen(lib, false), { icon: 'plus' });
+    popSep(c);
+    popItem(c, L('إضافة ملفات...', 'Add files...'), null, () => libAddPick(lib, 'files'), { icon: 'm-file' });
+    popItem(c, L('إضافة مجلد...', 'Add folder...'), null, () => libAddPick(lib, 'folder'), { icon: 'm-folder' });
+    popItem(c, L('إعادة تسمية...', 'Rename...'), null, async () => {
+      const n = await libAsk(L('اسم المكتبة', 'Library name'), lib.name);
+      if (n && await libNameFree(n, lib.id)) { lib.name = n; libSave(); }
+    }, { icon: 'm-tag' });
+  });
+}
+function libFill(box) {
+  popHead(box, L('المكتبات', 'Libraries'));
+  libs.forEach((lib) => {
+    const it = popItem(box, lib.name + '  (' + lib.items.length + ')', null, () => libOpen(lib, true), { icon: 'm-list' });
+    const mk = (cls, txt, ic, fn) => {
+      const b = document.createElement(ic ? 'svg' : 'span');
+      if (ic) { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('data-ic', ic); s.setAttribute('class', 'pop-ic lib-act ' + cls); s.title = txt; it.appendChild(s); BPLUS_ICONS.hydrate(it); return s; }
+    };
+    const more = document.createElement('span'); more.className = 'lib-act lib-more'; more.textContent = '\u22EF'; more.title = L('خيارات', 'Options');
+    more.onclick = (ev) => { ev.stopPropagation(); const r = it.getBoundingClientRect(); libActions(lib, r); };
+    it.appendChild(more);
+    const tr = mk('lib-del', L('حذف', 'Delete'), 'trash');
+    tr.onclick = (ev) => { ev.stopPropagation(); hidePops(); libDelete(lib); };
+    more.style.marginInlineStart = 'auto';
+  });
+  if (!libs.length) { const e = document.createElement('div'); e.className = 'pop-head'; e.textContent = L('لا توجد مكتبات بعد', 'No libraries yet'); box.appendChild(e); }
+  popSep(box);
+  popItem(box, L('حفظ قائمة التشغيل الحالية كمكتبة...', 'Save current playlist as library...'), null, () => {
+    if (!playlist.length) { showOsd(L('قائمة التشغيل فارغة', 'The playlist is empty')); return; }
+    libNew(playlist.map(libSlim));
+  }, { icon: 'm-file' });
+  popItem(box, L('إضافة قائمة جديدة', 'Add new list'), null, () => libNew([]), { icon: 'plus' });
+}
+$('pl-lib').title = L('المكتبات', 'Libraries');
+$('pl-lib').onclick = (ev) => { ev.stopPropagation(); showPop(menuPop, $('pl-lib'), libFill); };

@@ -4,16 +4,16 @@ Unicode true
 !include "StrFunc.nsh"
 ${StrStr}
 ${UnStrStr}
-Name "B+ Media Player 1.0.13"
-OutFile "../dist/Bplus-Media-Player-1.0.13-Setup.exe"
+Name "B+ Media Player 1.0.14"
+OutFile "../dist/Bplus-Media-Player-1.0.14-Setup.exe"
 InstallDir "$LOCALAPPDATA\Programs\Bplus Software\bplus media player"
 InstallDirRegKey HKCU "Software\Bplus" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID zlib
-VIProductVersion "1.0.13.0"
+VIProductVersion "1.0.14.0"
 VIAddVersionKey "ProductName" "B+ Media Player"
 VIAddVersionKey "FileDescription" "B+ per-user installer"
-VIAddVersionKey "FileVersion" "1.0.13"
+VIAddVersionKey "FileVersion" "1.0.14"
 VIAddVersionKey "LegalCopyright" "B+ contributors"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\B+.exe"
@@ -130,7 +130,7 @@ Section "B+"
  CreateShortcut "$SMPROGRAMS\B+ Media Player\B+ Media Player.lnk" "$INSTDIR\B+.exe"
  CreateShortcut "$DESKTOP\B+ Media Player.lnk" "$INSTDIR\B+.exe"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayName" "B+ Media Player"
- WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayVersion" "1.0.13"
+ WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayVersion" "1.0.14"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "UninstallString" '$\"$INSTDIR\Uninstall Bplus.exe$\"'
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayIcon" "$INSTDIR\B+.exe"
  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "NoModify" 1
@@ -177,7 +177,7 @@ Section "B+"
  !insertmacro RegisterType mp2
  !insertmacro RegisterType oga
  !insertmacro RegisterType weba
- System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
+ System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0x3000, p 0, p 0)'
 SectionEnd
 Section "Uninstall"
  !insertmacro EnsureClosed uninstall
@@ -237,5 +237,5 @@ Section "Uninstall"
  RMDir /r "$INSTDIR"
  ; Shared parent for all B+ programs: removed only when empty (RMDir without /r).
  RMDir "$LOCALAPPDATA\Programs\Bplus Software"
- System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
+ System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0x3000, p 0, p 0)'
 SectionEnd

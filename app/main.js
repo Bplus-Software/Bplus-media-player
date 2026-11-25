@@ -1,5 +1,5 @@
 const startupAt = performance.now();
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -185,7 +185,7 @@ async function openSubtitle() {
   });
   if (r.canceled || !r.filePaths.length) return;
   const p = r.filePaths[0];
-  send('subtitle:load', { name: path.basename(p), content: fs.readFileSync(p, 'utf8') });
+  send('subtitle:load', { name: path.basename(p), path: p, content: fs.readFileSync(p, 'utf8') });
 }
 
 function getDecoderBinary(){return process.platform==='win32'?(app.isPackaged?path.join(process.resourcesPath,'ffmpeg','ffmpeg.exe'):path.join(__dirname,'..','vendor','ffmpeg','ffmpeg.exe')):(process.env.BPLUS_FFMPEG||'/usr/bin/ffmpeg');}
@@ -216,6 +216,20 @@ ipcMain.handle('media:siblings', (e, p) => {
   } catch { return [mediaEntry(p)]; }
 });
 ipcMain.handle('media:open-folder', openFolder);
+// Pick media for a library without touching the playlist. kind: 'files' | 'folder'. Returns entries (snapshot of the files now).
+ipcMain.handle('media:pick', async (e, kind) => {
+  if (kind === 'folder') {
+    const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
+    if (r.canceled || !r.filePaths.length) return [];
+    const dir = r.filePaths[0];
+    return fs.readdirSync(dir).filter(f => MEDIA_EXTS.includes(path.extname(f).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' })).map(f => mediaEntry(path.join(dir, f)));
+  }
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [
+    { name: uiLang==='en' ? 'Media files' : 'ملفات الوسائط', extensions: MEDIA_EXTS.map(x => x.slice(1)) },
+    { name: uiLang==='en' ? 'All files' : 'كل الملفات', extensions: ['*'] }] });
+  return r.canceled ? [] : r.filePaths.map(mediaEntry);
+});
 ipcMain.handle('subtitle:open', openSubtitle);
 ipcMain.handle('cover:extract', async (e, p) => {
  try {
@@ -235,7 +249,17 @@ ipcMain.handle('cover:extract', async (e, p) => {
  } catch { return null; }
 });
 ipcMain.handle('app:about', () => send('menu:action', 'about'));
-ipcMain.handle('subtitle:read', (e, p) => ({ name: path.basename(p), content: fs.readFileSync(p, 'utf8') }));
+ipcMain.handle('subtitle:read', (e, p) => ({ name: path.basename(p), path: p, content: fs.readFileSync(p, 'utf8') }));
+ipcMain.handle('subtitle:save-shifted', (e, src, content) => {
+  try {
+    if (!src || typeof content !== 'string' || content.length > 20e6) return null;
+    const ext = path.extname(src);
+    const out = path.join(path.dirname(src), path.basename(src, ext) + '.synced' + ext);
+    if (path.resolve(out).toLowerCase() === path.resolve(src).toLowerCase()) return null;
+    fs.writeFileSync(out, content, 'utf8');
+    return path.basename(out);
+  } catch (err) { return null; }
+});
 ipcMain.handle('subtitle:auto', (e, videoPath) => {
   const dir = path.dirname(videoPath);
   const base = path.basename(videoPath, path.extname(videoPath)).toLowerCase();
@@ -243,7 +267,7 @@ ipcMain.handle('subtitle:auto', (e, videoPath) => {
     for (const f of fs.readdirSync(dir)) {
       const ext = path.extname(f).toLowerCase();
       if (SUB_EXTS.includes(ext) && path.basename(f, ext).toLowerCase() === base) {
-        return { name: f, content: fs.readFileSync(path.join(dir, f), 'utf8') };
+        return { name: f, path: path.join(dir, f), content: fs.readFileSync(path.join(dir, f), 'utf8') };
       }
     }
   } catch (_) {}
@@ -264,6 +288,21 @@ ipcMain.handle('snapshot:save', async (e, dataUrl) => {
 ipcMain.handle('system:defaults', () => process.platform === 'win32' ? shell.openExternal('ms-settings:defaultapps') : Promise.resolve('Windows only'));
 ipcMain.handle('system:info', () => ({ platform: process.platform, installed: !process.env.PORTABLE_EXECUTABLE_FILE && app.isPackaged }));
 
+
+let trayOn=false, tray=null;
+function destroyTray(){if(tray){try{tray.destroy()}catch(e){}tray=null}}
+function restoreFromTray(){destroyTray();if(win){win.show();if(win.isMinimized())win.restore();win.focus()}}
+async function hideToTray(){
+  if(!win||tray)return;
+  try{
+    const img=await app.getFileIcon(process.execPath,{size:'small'});
+    tray=new Tray(img);tray.setToolTip('B+ Media Player');
+    tray.on('click',restoreFromTray);tray.on('double-click',restoreFromTray);
+    tray.setContextMenu(Menu.buildFromTemplate([{label:uiLang==='en'?'Open B+':'فتح B+',click:restoreFromTray},{label:uiLang==='en'?'Exit':'خروج',click:()=>{destroyTray();app.quit()}}]));
+    win.hide();
+  }catch(e){destroyTray();if(win&&!win.isVisible())win.show()}
+}
+ipcMain.handle('tray:set',(e,flag)=>{trayOn=!!flag;if(!trayOn&&tray)restoreFromTray();return trayOn});
 ipcMain.on('win:min', () => win && win.minimize());
 ipcMain.on('win:max-toggle', () => { if (win) { win.isMaximized() ? win.unmaximize() : win.maximize(); } });
 ipcMain.on('win:close', () => win && win.close());
@@ -289,6 +328,8 @@ function createWindow() {
       spellcheck: false
     }
   });
+  win.on('minimize', () => { if (trayOn) hideToTray(); });
+  win.on('closed', () => destroyTray());
   // The player window never talks to the network. Main-process requests (no webContentsId) to the
 // GitHub update hosts are allowed: the blanket block used to cancel our own updater (ERR_BLOCKED_BY_CLIENT).
   const UPD_HOSTS = /^(?:api\.github\.com|github\.com|objects\.githubusercontent\.com|release-assets\.githubusercontent\.com|github-releases\.githubusercontent\.com)$/i;
