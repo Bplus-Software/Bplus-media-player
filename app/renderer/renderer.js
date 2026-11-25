@@ -77,10 +77,10 @@ function renderPlaylist() {
     li.oncontextmenu = (ev) => {
       ev.preventDefault(); ev.stopPropagation(); plSel = i; renderPlaylist();
       showPop(ctxMenu, { getBoundingClientRect: () => ({ left: ev.clientX, right: ev.clientX, top: ev.clientY, bottom: ev.clientY }) }, (c) => {
-        popItem(c, L('تشغيل', 'Play'), null, () => playAt(i));
-        popItem(c, L('إزالة من القائمة', 'Remove from list'), 'Del', () => removeAt(i));
+        popItem(c, L('تشغيل', 'Play'), null, () => playAt(i), { icon: 'm-play' });
+        popItem(c, L('إزالة من القائمة', 'Remove from list'), 'Del', () => removeAt(i), { icon: 'm-minus' });
         popSep(c);
-        popItem(c, L('حذف الملف (سلة المحذوفات)', 'Delete file (Recycle Bin)'), 'Shift+Del', () => trashAt(i));
+        popItem(c, L('حذف الملف (سلة المحذوفات)', 'Delete file (Recycle Bin)'), 'Shift+Del', () => trashAt(i), { icon: 'm-trash' });
       });
     };
     plList.appendChild(li);
@@ -185,7 +185,7 @@ async function playAt(i, forcePlay=false) {
   activeResumeKey=null;
   const key=resumeKey(item.path);const resume=resumePositions[key]?.time||0;
   titleLabel.textContent = item.name;tbTitle.textContent = item.name + '  |  B+ Media Player';
-  dropHint.classList.add('hidden');renderPlaylist();
+  dropHint.classList.add('hidden');renderPlaylist();if(window.BPLUS_RECENT)window.BPLUS_RECENT.add(item);
   async function loadPrepared(result){
    if(serial!==playbackSerial)return;
    activeResumeKey=key;
@@ -662,15 +662,15 @@ $('pl-sort').onclick = (ev) => {
   const P = window.BPLUS_SETTINGS.prefs;
   showPop(menuPop, $('pl-sort'), (c) => {
     popHead(c, L('ترتيب القائمة', 'Sort playlist'));
-    [['name', L('الاسم', 'Name')], ['date', L('تاريخ التعديل', 'Date modified')], ['size', L('الحجم', 'Size')], ['type', L('النوع', 'Type')]].forEach(([k, label]) => {
-      popItem(c, label, null, () => { P.sortBy = k; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortBy === k });
+    [['name', L('الاسم', 'Name'), 'm-text'], ['date', L('تاريخ التعديل', 'Date modified'), 'm-cal'], ['size', L('الحجم', 'Size'), 'm-size'], ['type', L('النوع', 'Type'), 'm-tag']].forEach(([k, label, ic]) => {
+      popItem(c, label, null, () => { P.sortBy = k; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortBy === k, icon: ic });
     });
     popSep(c);
-    popItem(c, L('تصاعدي', 'Ascending'), null, () => { P.sortDir = 1; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortDir !== -1 });
-    popItem(c, L('تنازلي', 'Descending'), null, () => { P.sortDir = -1; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortDir === -1 });
+    popItem(c, L('تصاعدي', 'Ascending'), null, () => { P.sortDir = 1; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortDir !== -1, icon: 'm-up' });
+    popItem(c, L('تنازلي', 'Descending'), null, () => { P.sortDir = -1; window.BPLUS_SETTINGS.save(); sortPlaylist(); }, { checkable: true, checked: P.sortDir === -1, icon: 'm-down' });
     popSep(c);
-    popItem(c, L('عكس الترتيب', 'Reverse order'), null, () => { const cur = playlist[current], sel = playlist[plSel]; playlist.reverse(); current = playlist.indexOf(cur); plSel = playlist.indexOf(sel); renderPlaylist(); });
-    popItem(c, L('خلط الترتيب', 'Shuffle order'), null, () => { const cur = playlist[current], sel = playlist[plSel]; for (let i = playlist.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [playlist[i], playlist[j]] = [playlist[j], playlist[i]]; } current = playlist.indexOf(cur); plSel = playlist.indexOf(sel); renderPlaylist(); });
+    popItem(c, L('عكس الترتيب', 'Reverse order'), null, () => { const cur = playlist[current], sel = playlist[plSel]; playlist.reverse(); current = playlist.indexOf(cur); plSel = playlist.indexOf(sel); renderPlaylist(); }, { icon: 'm-swap' });
+    popItem(c, L('خلط الترتيب', 'Shuffle order'), null, () => { const cur = playlist[current], sel = playlist[plSel]; for (let i = playlist.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [playlist[i], playlist[j]] = [playlist[j], playlist[i]]; } current = playlist.indexOf(cur); plSel = playlist.indexOf(sel); renderPlaylist(); }, { icon: 'm-shuf' });
   });
 };
 $('pl-shuffle').onclick = () => {
@@ -839,6 +839,7 @@ $('tb-pin').onclick = async () => {
   $('tb-pin').classList.toggle('on', on);
 };
 $('tb-open').onclick = () => window.bplus.openFiles();
+$('tb-recent').onclick = (ev) => { ev.stopPropagation(); if (window.BPLUS_RECENT) window.BPLUS_RECENT.menu($('tb-recent')); };
 $('pl-add').onclick = () => window.bplus.openFiles();
 $('pl-clear').onclick = () => { playbackSerial++;window.bplus.cancelPreparation();prep.hidden=true;audioViz.hidden=true;savePosition();activeResumeKey=null;playlist = []; current = -1; player.removeAttribute('src'); player.load(); setPlayingUI(false); titleLabel.textContent = ''; tbTitle.textContent = ''; renderPlaylist(); };
 
@@ -857,8 +858,19 @@ function popItem(container, label, shortcut, fn, opts = {}) {
     ck.className = 'ck'; ck.textContent = opts.checked ? '✓' : '';
     d.appendChild(ck);
   }
+  if (opts.icon) {
+    const ic = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    ic.setAttribute('data-ic', opts.icon); ic.setAttribute('class', 'pop-ic');
+    d.appendChild(ic); BPLUS_ICONS.hydrate(d);
+  }
   const l = document.createElement('span');
-  l.textContent = label;
+  if (/[\u0600-\u06FF]/.test(label) && /[A-Za-z]/.test(label)) {
+    // Latin words inside Arabic text (e.g. B+) keep their own direction
+    label.split(/([A-Za-z][A-Za-z0-9+.\-]*)/).forEach((part) => {
+      if (/^[A-Za-z]/.test(part)) { const b = document.createElement('span'); b.textContent = part; b.style.cssText = 'direction:ltr;unicode-bidi:isolate;display:inline-block'; l.appendChild(b); }
+      else if (part) l.appendChild(document.createTextNode(part));
+    });
+  } else l.textContent = label;
   d.appendChild(l);
   if (shortcut) {
     const sc = document.createElement('span');
@@ -905,19 +917,20 @@ function hidePops() {
 $('tb-menu').onclick = (ev) => {
   ev.stopPropagation();
   showPop(menuPop, $('tb-menu'), (c) => {
-    popItem(c, L('فتح ملف...', 'Open file...'), 'Ctrl+O', () => window.bplus.openFiles());
-    popItem(c, L('فتح مجلد...', 'Open folder...'), 'Ctrl+Shift+O', () => window.bplus.openFolder());
+    popItem(c, L('فتح ملف...', 'Open file...'), 'Ctrl+O', () => window.bplus.openFiles(), { icon: 'm-file' });
+    popItem(c, L('فتح مجلد...', 'Open folder...'), 'Ctrl+Shift+O', () => window.bplus.openFolder(), { icon: 'm-folder' });
+    popItem(c, L('الملفات الحديثة...', 'Recent files...'), null, () => setTimeout(() => window.BPLUS_RECENT && window.BPLUS_RECENT.menu($('tb-menu')), 0), { icon: 'recent' });
     popSep(c);
-    popItem(c, L('تحميل ملف ترجمة...', 'Load subtitles...'), 'Ctrl+L', () => window.bplus.openSubtitleDialog());
-    popItem(c, L('إظهار / إخفاء الترجمة', 'Show / hide subtitles'), 'Ctrl+T', toggleSubtitleVisible);
+    popItem(c, L('تحميل ملف ترجمة...', 'Load subtitles...'), 'Ctrl+L', () => window.bplus.openSubtitleDialog(), { icon: 'm-sub' });
+    popItem(c, L('إظهار / إخفاء الترجمة', 'Show / hide subtitles'), 'Ctrl+T', toggleSubtitleVisible, { icon: 'm-eye' });
     popSep(c);
-    popItem(c, L('قائمة التشغيل', 'Playlist'), 'Ctrl+P', () => playlistEl.classList.toggle('hidden'));
-    popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen);
-    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen);
+    popItem(c, L('قائمة التشغيل', 'Playlist'), 'Ctrl+P', () => playlistEl.classList.toggle('hidden'), { icon: 'm-list' });
+    popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen, { icon: 'm-full' });
+    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen, { icon: 'm-clean' });
     popSep(c);
-    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open());
-    popItem(c, L('حول B+', 'About B+'), null, () => window.dispatchEvent(new Event('bplus-about')));
-    popItem(c, L('خروج', 'Exit'), null, () => window.bplus.winClose());
+    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open(), { icon: 'm-gear' });
+    popItem(c, L('حول B+', 'About B+'), null, () => window.dispatchEvent(new Event('bplus-about')), { icon: 'm-info' });
+    popItem(c, L('خروج', 'Exit'), null, () => window.bplus.winClose(), { icon: 'm-exit' });
   });
 };
 
@@ -930,26 +943,26 @@ $('b-set').onclick = (ev) => {
         { checkable: true, checked: i === rateIdx });
     });
     popSep(c);
-    popItem(c, L('حول B+', 'About B+'), null, () => window.dispatchEvent(new Event('bplus-about')));
+    popItem(c, L('حول B+', 'About B+'), null, () => window.dispatchEvent(new Event('bplus-about')), { icon: 'm-info' });
   });
 };
 
 $('video-wrap').addEventListener('contextmenu', (e) => {
   e.preventDefault();
   showPop(ctxMenu, { getBoundingClientRect: () => ({ left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY }) }, (c) => {
-    popItem(c, L('تشغيل / إيقاف مؤقت', 'Play / pause'), 'Space', togglePlay);
-    popItem(c, L('التالي', 'Next'), 'PgDn', next);
-    popItem(c, L('السابق', 'Previous'), 'PgUp', prev);
+    popItem(c, L('تشغيل / إيقاف مؤقت', 'Play / pause'), 'Space', togglePlay, { icon: 'm-play' });
+    popItem(c, L('التالي', 'Next'), 'PgDn', next, { icon: 'm-next' });
+    popItem(c, L('السابق', 'Previous'), 'PgUp', prev, { icon: 'm-prev' });
     popSep(c);
-    popItem(c, L('فتح ملف...', 'Open file...'), 'Ctrl+O', () => window.bplus.openFiles());
-    popItem(c, L('تحميل ترجمة...', 'Load subtitles...'), 'Ctrl+L', () => window.bplus.openSubtitleDialog());
-    popItem(c, L('لقطة شاشة', 'Snapshot'), null, takeSnapshot);
+    popItem(c, L('فتح ملف...', 'Open file...'), 'Ctrl+O', () => window.bplus.openFiles(), { icon: 'm-file' });
+    popItem(c, L('تحميل ترجمة...', 'Load subtitles...'), 'Ctrl+L', () => window.bplus.openSubtitleDialog(), { icon: 'm-sub' });
+    popItem(c, L('لقطة شاشة', 'Snapshot'), null, takeSnapshot, { icon: 'm-cam' });
     popSep(c);
-    popItem(c, L('قائمة التشغيل', 'Playlist'), null, () => playlistEl.classList.toggle('hidden'));
-    popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen);
-    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen);
+    popItem(c, L('قائمة التشغيل', 'Playlist'), null, () => playlistEl.classList.toggle('hidden'), { icon: 'm-list' });
+    popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen, { icon: 'm-full' });
+    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen, { icon: 'm-clean' });
     popSep(c);
-    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open());
+    popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open(), { icon: 'm-gear' });
   });
 });
 document.addEventListener('click', hidePops);

@@ -12,11 +12,14 @@
     <div class="tb-side">
       <div id="brand"><span class="brand-b">B</span><span class="brand-plus">+</span></div>
       <button id="tb-menu" class="tbtn" title="القائمة">
-        <svg data-ic="menu"></svg>
+        <svg viewBox="0 0 256 256" class="dots3"><path fill="currentColor" d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128ZM128,72a12,12,0,1,0-12-12A12,12,0,0,0,128,72Zm0,112a12,12,0,1,0,12,12A12,12,0,0,0,128,184Z"/></svg>
       </button>
     </div>
     <div id="tb-drag"><span id="tb-title" dir="auto"></span></div>
     <div class="tb-side tb-win">
+      <button class="tbtn" id="tb-recent" title="الملفات الحديثة">
+        <svg data-ic="recent"></svg>
+      </button>
       <button class="tbtn" id="tb-open" title="فتح ملف">
         <svg data-ic="open"></svg>
       </button>
@@ -37,9 +40,10 @@
     <div id="video-wrap">
       <video id="player" playsinline disableRemotePlayback disablePictureInPicture></video>
       <div id="drop-hint">
-        <div id="hint-logo"><img class="brand-mark" src="brand.svg" alt="B+"></div>
+        <div id="hint-logo"><div class="hint-wordmark" dir="ltr" aria-label="B+ Media Player"><span class="wm-b">B<span class="wm-plus">+</span></span><span class="wm-name">Media Player</span></div></div>
         <div class="hint-sub">أفلت ملفات الفيديو أو الصوت هنا، أو اضغط Ctrl+O</div>
       </div>
+      <div id="recent-start" hidden></div>
       <div id="audio-viz" hidden>
         <img id="audio-cover" alt="" hidden>
         <div id="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
