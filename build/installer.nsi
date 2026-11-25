@@ -25,6 +25,7 @@ VIAddVersionKey "LegalCopyright" "B+ contributors"
 !insertmacro MUI_LANGUAGE "English"
 
  ; Stable upgrade identity: HKCU uninstall key Bplus. No versioned key or MSI GUID.
+Var OLDDIR
 Function .onInit
  SetShellVarContext current
  ; v1.5 and later record this value in both stable locations.
@@ -48,6 +49,13 @@ Function .onInit
  IfFileExists "$1\B+.exe" 0 path_ready
  StrCpy $INSTDIR $1
  path_ready:
+ ; Move an install from the old default folder into the Bplus Software parent. Custom folders stay where they are.
+ StrCpy $OLDDIR ""
+ StrCmp $INSTDIR "$LOCALAPPDATA\Programs\Bplus" 0 move_done
+ IfFileExists "$INSTDIR\Uninstall Bplus.exe" 0 move_done
+ StrCpy $OLDDIR $INSTDIR
+ StrCpy $INSTDIR "$LOCALAPPDATA\Programs\Bplus Software\bplus media player"
+ move_done:
 FunctionEnd
 
 !macro RegisterType EXT
@@ -105,6 +113,8 @@ Section "B+"
  RMDir /r "$INSTDIR\resources\whisper"
  RMDir /r "$APPDATA\bplus-player\whisper-models"
  WriteUninstaller "$INSTDIR\Uninstall Bplus.exe"
+ StrCmp $OLDDIR "" +2
+ RMDir /r "$OLDDIR"
  WriteRegStr HKCU "Software\Bplus" "InstallLocation" "$INSTDIR"
  WriteRegStr HKCU "Software\Bplus" "AppId" "com.bplus.player"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "InstallLocation" "$INSTDIR"
