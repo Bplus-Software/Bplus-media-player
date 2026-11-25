@@ -52,8 +52,25 @@ public class MainActivity extends Activity {
   boolean resumed;
   android.graphics.Bitmap cover;
 
+  String langMode() {
+    String m = prefs.getString("lang", null);
+    if (m == null) {
+      m = prefs.contains("english") ? (prefs.getBoolean("english", false) ? "en" : "ar") : "system";
+      prefs.edit().putString("lang", m).apply();
+    }
+    return m;
+  }
+
+  boolean english() {
+    String m = langMode();
+    if (m.equals("en")) return true;
+    if (m.equals("ar")) return false;
+    String l = getResources().getConfiguration().getLocales().get(0).getLanguage();
+    return !l.equals("ar");
+  }
+
   String tr(String ar, String en) {
-    return prefs.getBoolean("english", false) ? en : ar;
+    return english() ? en : ar;
   }
 
   final ServiceConnection conn =
@@ -279,7 +296,7 @@ public class MainActivity extends Activity {
     root = new FrameLayout(this);
     root.setBackgroundColor(bg);
     root.setLayoutDirection(
-        prefs.getBoolean("english", false) ? View.LAYOUT_DIRECTION_LTR : View.LAYOUT_DIRECTION_RTL);
+        english() ? View.LAYOUT_DIRECTION_LTR : View.LAYOUT_DIRECTION_RTL);
     page = col();
     root.addView(page, new FrameLayout.LayoutParams(-1, -1));
     root.setOnApplyWindowInsetsListener(
@@ -2230,7 +2247,7 @@ public class MainActivity extends Activity {
     int current = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
     TextView value = text(Math.round(current * 100f / Math.max(1, max)) + "%", 14, ink);
     value.setTextDirection(View.TEXT_DIRECTION_LTR);
-    value.setGravity(prefs.getBoolean("english", false) ? Gravity.LEFT : Gravity.RIGHT);
+    value.setGravity(english() ? Gravity.LEFT : Gravity.RIGHT);
     content.addView(value);
     SeekBar bar = new SeekBar(this);
     bar.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
@@ -2357,8 +2374,7 @@ public class MainActivity extends Activity {
         (v, on) -> {
           prefs.edit().putBoolean(key, on).apply();
           if (key.equals("autoUpdate")) UpdateEngine.schedule(this);
-          if (key.equals("english")) settingsHome();
-        });
+                  });
     l.addView(sw);
     rule(l);
   }
@@ -2371,7 +2387,7 @@ public class MainActivity extends Activity {
     t.setMinHeight(dp(36));
     t.setGravity(Gravity.CENTER_VERTICAL);
     r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
-    TextView arrow = text(prefs.getBoolean("english", false) ? "›" : "‹", 22, muted);
+    TextView arrow = text(english() ? "›" : "‹", 22, muted);
     arrow.setGravity(Gravity.CENTER);
     r.addView(arrow, new LinearLayout.LayoutParams(dp(32), dp(44)));
     r.setOnClickListener(v -> action.run());

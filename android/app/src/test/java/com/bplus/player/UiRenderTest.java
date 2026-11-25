@@ -1020,7 +1020,7 @@ public class UiRenderTest {
   @Test
   public void audioEqualizerLeftBrandAndSpeed() throws Exception {
     for (boolean english : new boolean[] {false, true}) {
-      a.prefs.edit().putBoolean("english", english).apply();
+      a.prefs.edit().putString("lang", english ? "en" : "ar").apply();
       service.queue.clear();
       service.queue.add(video("Evening recitation.mp3"));
       service.index = 0;
@@ -1219,7 +1219,7 @@ public class UiRenderTest {
   @Test
   public void audioVolumeOnlyAndMatchedTransportIcons() throws Exception {
     for (boolean english : new boolean[] {false, true}) {
-      a.prefs.edit().putBoolean("english", english).apply();
+      a.prefs.edit().putString("lang", english ? "en" : "ar").apply();
       service.queue.clear();
       service.queue.add(video("Evening recitation.mp3"));
       service.index = 0;
@@ -1295,5 +1295,38 @@ public class UiRenderTest {
         if (hasText(group.getChildAt(k), query)) return true;
     }
     return false;
+  }
+
+  void deviceLocale(String lang) {
+    android.content.res.Configuration c =
+        new android.content.res.Configuration(a.getResources().getConfiguration());
+    c.setLocales(new android.os.LocaleList(new java.util.Locale(lang)));
+    a.getResources().updateConfiguration(c, a.getResources().getDisplayMetrics());
+  }
+
+  @Test
+  public void defaultLanguageFollowsDevice() throws Exception {
+    a.prefs.edit().clear().apply();
+    deviceLocale("ar");
+    Assert.assertFalse(a.english());
+    Assert.assertEquals("لغة الجهاز", a.tr("لغة الجهاز", "Device language"));
+    deviceLocale("en");
+    Assert.assertTrue(a.english());
+    deviceLocale("fr");
+    Assert.assertTrue(a.english());
+    Assert.assertEquals("system", a.langMode());
+    a.prefs.edit().putString("lang", "ar").apply();
+    Assert.assertFalse(a.english());
+    a.prefs.edit().clear().putBoolean("english", true).apply();
+    deviceLocale("ar");
+    Assert.assertTrue(a.english());
+    Assert.assertEquals("en", a.langMode());
+    a.prefs.edit().clear().apply();
+    deviceLocale("en");
+    a.settings("language");
+    render("71-language-device-english", 786, 1704);
+    deviceLocale("ar");
+    a.settings("language");
+    render("72-language-device-arabic", 786, 1704);
   }
 }

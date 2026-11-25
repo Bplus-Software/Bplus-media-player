@@ -113,12 +113,13 @@ final class MobileSettings {
       case "language":
         {
           LinearLayout c = card(t("لغة واجهة البرنامج", "App interface language"));
+          String lm = a.langMode();
           segments(
               c,
-              new String[] {"العربية", "English"},
-              a.prefs.getBoolean("english", false) ? 1 : 0,
+              new String[] {t("لغة الجهاز", "Device language"), "العربية", "English"},
+              lm.equals("system") ? 0 : lm.equals("ar") ? 1 : 2,
               k -> {
-                a.prefs.edit().putBoolean("english", k == 1).apply();
+                a.prefs.edit().putString("lang", k == 0 ? "system" : k == 1 ? "ar" : "en").apply();
                 open(current);
               });
           break;
