@@ -344,3 +344,6 @@ html:fullscreen body.fs-pure.fs-cursor #video-wrap, html:fullscreen body.fs-pure
 .pl-tools { gap: 0; }
 .pl-tools button { padding-inline: 4px; }
 #title-label{pointer-events:auto}#title-label.scrolling{text-overflow:clip;text-align:start}
+#title-label{max-width:none}
+#quick-av,#speed-pop{box-shadow:none}
+#speed-pop input[type=range]{accent-color:var(--accent);height:4px;cursor:pointer}

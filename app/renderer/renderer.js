@@ -861,7 +861,21 @@ bigPlay.onclick = togglePlay;
 $('b-next').onclick = next;
 $('b-prev').onclick = prev;
 $('b-stop').onclick = () => { playbackSerial++;window.bplus.cancelPreparation();prep.hidden=true;audioViz.hidden=true;player.pause(); player.currentTime = 0; updateSeekUI(); };
-bSubVis.addEventListener('contextmenu', (e) => { e.preventDefault(); window.bplus.openSubtitleDialog(); });
+bSubVis.addEventListener('contextmenu', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  showPop(ctxMenu, bSubVis, (c) => {
+    popItem(c, L('فتح ملف ترجمة...', 'Open subtitle...'), null, () => window.bplus.openSubtitleDialog(), { icon: 'm-sub' });
+    popItem(c, L('البحث عن ترجمة', 'Search for subtitle'), null, searchSubtitle, { icon: 'm-text' });
+  });
+});
+async function searchSubtitle() {
+  const item = playlist[current];
+  if (!item) { showOsd(L('شغّل ملفًا أولًا', 'Play a file first')); return; }
+  const found = await window.bplus.findSubtitle(item.path);
+  if (found) { setSubtitle(found); showOsd(L('تم تحميل الترجمة: ', 'Subtitle loaded: ') + found.name); return; }
+  await window.bplus.webSearchSubtitle(item.name);
+  showOsd(L('لا توجد ترجمة بجوار الملف، فتحت البحث في المتصفح', 'No subtitle next to the file, opened a web search'));
+}
 bSubVis.onclick = toggleSubtitleVisible;
 $('b-snap').onclick = takeSnapshot;
 $('b-pl').onclick = () => playlistEl.classList.toggle('hidden');
@@ -1216,14 +1230,12 @@ function fitTitleLabel() {
   if (!row || !lab) return;
   lab.classList.remove('fit-hide'); lab.style.left = ''; lab.style.maxWidth = 'none';
   const nat = lab.offsetWidth;
-  const rr = row.getBoundingClientRect(), center = rr.left + rr.width / 2;
+  const rr = row.getBoundingClientRect();
   const l = left.getBoundingClientRect(), r = right.getBoundingClientRect();
-  const sym = 2 * Math.min(center - l.right, r.left - center) - 24;   // room if the name stays at the exact bar center
-  const gap = r.left - l.right - 24;                                    // all free room between the time and SUB
-  if (nat <= sym) { lab.style.maxWidth = ''; return; }                  // fits: exact center, no cutting
+  const gap = r.left - l.right - 28;                 // free room between the time and the SUB button
   if (gap < 90) { lab.style.maxWidth = ''; lab.classList.add('fit-hide'); return; }
-  // too long for the exact center: use the whole free space, centered in it; "..." only if it still does not fit
-  lab.style.maxWidth = gap + 'px';
+  // always centered in that free room; "..." only when the name is longer than the room
+  lab.style.maxWidth = Math.min(nat + 2, gap) + 'px';
   lab.style.left = ((l.right + r.left) / 2 - rr.left) + 'px';
 }
 /* Hover on a cut-off file name: scroll it so the whole name shows, then scroll back on leave. */
@@ -1253,7 +1265,7 @@ function fitTitleLabel() {
 })();
 window.addEventListener('resize', fitTitleLabel);
 new MutationObserver(fitTitleLabel).observe(titleLabel, { childList: true, characterData: true, subtree: true });
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fitTitleLabel).observe($('btn-row'));
+if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(fitTitleLabel); ro.observe($('btn-row')); ro.observe($('times')); ro.observe($('b-subvis')); }
 setTimeout(fitTitleLabel, 0);
 
 

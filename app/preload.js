@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('bplus', {
   openDefaults: () => ipcRenderer.invoke('system:defaults'),
   systemInfo: () => ipcRenderer.invoke('system:info'),
   openFiles: () => ipcRenderer.invoke('media:open'),
+  findSubtitle: (p) => ipcRenderer.invoke('subtitle:find', p),
+  webSearchSubtitle: (n) => ipcRenderer.invoke('subtitle:web-search', n),
   pickMedia: (kind) => ipcRenderer.invoke('media:pick', kind),
   openFolder: () => ipcRenderer.invoke('media:open-folder'),
   openSubtitleDialog: () => ipcRenderer.invoke('subtitle:open'),

@@ -196,7 +196,7 @@
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.14');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.15');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}
@@ -221,10 +221,10 @@
    const foot=document.createElement('div');foot.className='spd-foot';const rst=document.createElement('button');rst.type='button';rst.textContent=ar?'إعادة إلى 1×':'Reset to 1×';rst.onclick=()=>spd.apply(1);
    const hint=document.createElement('span');hint.className='spd-hint';hint.textContent=ar?'Z أبطأ · X أسرع · C عادي':'Z slower · X faster · C normal';foot.append(hint,rst);
    el.append(head,input,marks,foot);document.body.append(el);spd.el=el;
-   const r=$('b-speed').getBoundingClientRect();const w=el.offsetWidth,h=el.offsetHeight;el.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))+'px';el.style.top=Math.max(8,r.top-h-8)+'px';
-   document.addEventListener('mousedown',spd.out,true);document.addEventListener('keydown',spd.key,true);player.addEventListener('ratechange',spd.sync);spd.sync()}};
+   placePanel(el);
+   document.addEventListener('mousedown',spd.out,true);document.addEventListener('keydown',spd.key,true);player.addEventListener('ratechange',spd.sync);spd.sync();placePanel(el)}};
  player.addEventListener('ratechange',()=>{$('b-speed').textContent=spd.fmt(player.playbackRate)});
- $('b-speed').onclick=(ev)=>{ev.stopPropagation();if(spd.el){spd.close();return}hidePops();spd.open()};
+ $('b-speed').onclick=(ev)=>{ev.stopPropagation();if(spd.el){spd.close();return}hidePops();{const q=document.getElementById('quick-av');if(q)q.hidden=true}spd.open()};
  $('b-av').onclick=(e)=>{e.stopPropagation();openQuick()};$('b-set').onclick=()=>open('playback');window.addEventListener('bplus-about',()=>open('about'));window.bplus.onMenuAction(a=>{if(a==='about')open('about')});
  // Configurable shortcuts. Ctrl file dialogs and F11 remain fixed.
  document.addEventListener('keydown',e=>{if(!overlay.hidden||e.ctrlKey||e.metaKey||e.altKey||['INPUT','SELECT','TEXTAREA','BUTTON','A'].includes(e.target.tagName))return;let key=e.key===' '?'Space':e.key.length===1?e.key.toLowerCase():e.key;if(e.shiftKey&&key.length===1)return;
@@ -262,16 +262,17 @@ const actions={shortcutSlower:()=>rateBump(0.8),shortcutFaster:()=>rateBump(1.25
  function renderQuick(tab){
   quickTab=tab;quick.replaceChildren();quick.dir=BPLUS_I18N.isRtl(prefs.uiLang)?'rtl':'ltr';
   const ar=prefs.language==='ar';
-  let h=document.createElement('header');h.textContent=ar?'الصورة والصوت':'Video & audio';let close=document.createElement('button');close.textContent='✕';close.onclick=()=>quick.hidden=true;h.append(close);quick.append(h);
+  let h=document.createElement('header');
   let tabs=document.createElement('div');tabs.className='quick-tabs';tabs.setAttribute('role','tablist');
   [['video',ar?'الصورة':'Video'],['audio',ar?'الصوت':'Audio']].forEach(([k,label])=>{let b=document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(k===tab));if(k===tab)b.className='on';b.onclick=()=>{renderQuick(k);placeQuick()};tabs.append(b)});quick.append(tabs);
   QUICK_TABS[tab].forEach(key=>quick.append(row(key)));
   let foot=document.createElement('footer');let reset=document.createElement('button');reset.textContent=ar?'إعادة ضبط':'Reset';reset.onclick=()=>{QUICK_TABS[tab].forEach(k=>prefs[k]=defaults[k]);save();renderQuick(tab)};foot.append(reset);quick.append(foot);
  }
- function placeQuick(){const anchor=$('b-av').getBoundingClientRect();quick.style.left=Math.max(8,Math.min(anchor.right-quick.offsetWidth,innerWidth-quick.offsetWidth-8))+'px';quick.style.top=Math.max(42,anchor.top-quick.offsetHeight-10)+'px'}
+ function placeQuick(){placePanel(quick)}
+ function placePanel(el){const a=$('b-av').getBoundingClientRect();const w=el.offsetWidth,h=el.offsetHeight;el.style.left=Math.max(8,Math.min(a.right-w,innerWidth-w-8))+'px';const c=document.getElementById('controls').getBoundingClientRect();el.style.top=Math.max(8,c.top-h-10)+'px'}
  function openQuick(){
   if(!quick.hidden){quick.hidden=true;return}
-  hidePops();overlay.hidden=true;renderQuick(quickTab);quick.hidden=false;placeQuick();
+  hidePops();spd.close();overlay.hidden=true;renderQuick(quickTab);quick.hidden=false;placeQuick();
  }
  quick.addEventListener('click',e=>e.stopPropagation());document.addEventListener('click',()=>quick.hidden=true);document.addEventListener('keydown',e=>{if(e.key==='Escape')quick.hidden=true});
  let updOsdT=0;

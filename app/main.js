@@ -274,6 +274,36 @@ ipcMain.handle('subtitle:auto', (e, videoPath) => {
   return null;
 });
 
+// Look for subtitle files that belong to a video: same folder plus Subs/Subtitles subfolders. Best match first.
+ipcMain.handle('subtitle:find', (e, videoPath) => {
+  try {
+    const dir = path.dirname(videoPath);
+    const norm = (s) => s.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').trim();
+    const base = norm(path.basename(videoPath, path.extname(videoPath)));
+    const dirs = [dir, path.join(dir, 'Subs'), path.join(dir, 'Subtitles'), path.join(dir, 'subs')];
+    let best = null;
+    for (const d of dirs) {
+      let files; try { files = fs.readdirSync(d); } catch { continue; }
+      for (const f of files) {
+        const ext = path.extname(f).toLowerCase();
+        if (!SUB_EXTS.includes(ext)) continue;
+        const n = norm(path.basename(f, ext));
+        const score = n === base ? 3 : (n.startsWith(base) || base.startsWith(n) ? 2 : (n.includes(base) || base.includes(n) ? 1 : 0));
+        if (score && (!best || score > best.score)) best = { score, p: path.join(d, f), f };
+      }
+    }
+    if (!best) return null;
+    return { name: best.f, path: best.p, content: fs.readFileSync(best.p, 'utf8') };
+  } catch { return null; }
+});
+// Web search in the default browser. Only a fixed https search URL is ever opened; the query is URL-encoded text.
+ipcMain.handle('subtitle:web-search', (e, name) => {
+  const q = String(name || '').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[._]+/g, ' ').trim().slice(0, 200);
+  if (!q) return false;
+  shell.openExternal('https://www.google.com/search?q=' + encodeURIComponent(q + ' subtitles'));
+  return true;
+});
+
 ipcMain.handle('snapshot:save', async (e, dataUrl) => {
   const r = await dialog.showSaveDialog(win, {
     defaultPath: 'B+-snapshot.png',
