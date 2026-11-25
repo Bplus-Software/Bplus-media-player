@@ -280,3 +280,11 @@ html:fullscreen body.fs-pure.fs-cursor #video-wrap, html:fullscreen body.fs-pure
 
 .ctl.on,.tbtn.on{color:var(--accent)}
 #b-subvis.off{color:var(--text-faint)}
+
+#b-off.armed{color:#ff6b5e}
+.off-dlg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999}
+.off-dlg[hidden]{display:none}
+.off-box{background:#2b2b2b;border:1px solid #444;border-radius:10px;padding:22px 28px;text-align:center;min-width:300px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.off-t{font-size:15px;font-weight:700;margin-bottom:8px}
+.off-n{font-size:34px;font-weight:700;color:#ff6b5e;margin:6px 0 14px;font-variant-numeric:tabular-nums}
+.off-btn{background:#3a86ff;color:#fff;border:0;border-radius:6px;padding:8px 22px;font:inherit;font-weight:700;cursor:pointer}

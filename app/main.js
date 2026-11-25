@@ -126,6 +126,7 @@ ipcMain.handle('update:prompt',async(e,info)=>{
  await dialog.showMessageBox(win,{type:'error',title:'B+',noLink:true,message:en?'Download failed. Check your internet connection and try again.':'فشل التنزيل. تحقق من اتصال الإنترنت وحاول مجددًا.'});
  return false;
 });
+ipcMain.handle('system:shutdown',()=>{if(process.platform!=='win32')return false;require('child_process').execFile('shutdown',['/s','/t','0']);return true;});
 ipcMain.handle('app:version',()=>app.getVersion());
 ipcMain.handle('dialog:confirm',async(e,opts)=>{const r=await dialog.showMessageBox(win,{type:'warning',buttons:opts.buttons,defaultId:0,cancelId:1,title:opts.title,message:opts.message,detail:opts.detail});return r.response;});
 ipcMain.handle('media:trash',async(e,p)=>{try{await shell.trashItem(p);return {ok:true};}catch(err){return {ok:false,error:String(err)};}});

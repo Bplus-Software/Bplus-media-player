@@ -6,7 +6,7 @@ ${StrStr}
 ${UnStrStr}
 Name "B+ Media Player 1.0.9"
 OutFile "../dist/Bplus-1.0.9-Setup.exe"
-InstallDir "$LOCALAPPDATA\Programs\Bplus"
+InstallDir "$LOCALAPPDATA\Programs\Bplus Software\bplus media player"
 InstallDirRegKey HKCU "Software\Bplus" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID zlib
@@ -225,5 +225,7 @@ Section "Uninstall"
  DeleteRegKey HKCU "Software\Classes\Applications\B+.exe"
  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus"
  RMDir /r "$INSTDIR"
+ ; Shared parent for all B+ programs: removed only when empty (RMDir without /r).
+ RMDir "$LOCALAPPDATA\Programs\Bplus Software"
  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 SectionEnd

@@ -179,6 +179,7 @@ function mediaFailure(code){const en=window.bplusPrefs?.language==='en';const me
 async function playAt(i, forcePlay=false) {
   if (i < 0 || i >= playlist.length) return;
   savePosition();const serial=++playbackSerial;
+  if(typeof setOffArmed==='function'){cancelOff();setOffArmed(false);}
   current = i;const item = playlist[i];
   player.pause();player.removeAttribute('src');player.load();audioViz.hidden=true;
   activeResumeKey=null;
@@ -710,7 +711,24 @@ function updateSeekUI() {
 
 player.addEventListener('play', () => setPlayingUI(true));
 player.addEventListener('pause', () => setPlayingUI(false));
+/* Shut down the computer after the current file. Off by default and reset whenever another file loads. */
+let offArmed=false,offTimer=0;
+const offBtn=$('b-off'),offDlg=$('off-dlg');
+function setOffArmed(v){offArmed=!!v;offBtn.classList.toggle('armed',offArmed);offBtn.title=offArmed?L('إيقاف الكمبيوتر بعد هذا الفيديو: مفعّل','Shutdown after this video: on'):L('إيقاف الكمبيوتر بعد انتهاء هذا الفيديو','Shut down computer after this video');}
+function cancelOff(){clearInterval(offTimer);offTimer=0;offDlg.hidden=true;}
+function startOffCountdown(){
+  let n=30;offDlg.hidden=false;
+  $('off-t').textContent=L('سيتم إيقاف الكمبيوتر خلال','Shutting down the computer in');
+  $('off-cancel').textContent=L('إلغاء','Cancel');
+  const tick=()=>{$('off-n').textContent=n;if(n<=0){cancelOff();window.bplus.shutdown&&window.bplus.shutdown();return;}n--;};
+  tick();offTimer=setInterval(tick,1000);
+}
+offBtn.addEventListener('click',()=>{setOffArmed(!offArmed);showOsd(offArmed?L('سيتم إيقاف الكمبيوتر بعد هذا الفيديو','Shutdown after this video: on'):L('تم إلغاء إيقاف الكمبيوتر','Shutdown after this video: off'));});
+$('off-cancel').addEventListener('click',()=>{cancelOff();setOffArmed(false);showOsd(L('تم إلغاء إيقاف الكمبيوتر','Shutdown after this video: off'));});
+document.addEventListener('keydown',e=>{if(!offDlg.hidden&&e.key==='Escape'){e.stopPropagation();$('off-cancel').click();}},true);
+setOffArmed(false);
 player.addEventListener('ended', () => {
+  if (offArmed) { startOffCountdown(); return; }
   if (repeatMode === 'one') return; /* native loop replays */
   if (repeatMode === 'all' && !shuffleOn && current >= playlist.length - 1) { playAt(0); return; }
   if (repeatMode === 'all' || window.bplusPrefs?.autoNext !== false) next();

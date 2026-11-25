@@ -2363,5 +2363,53 @@ window.BPLUS_I18N_DATA = {
 "B+ سیٹنگز",
 "Pengaturan B+",
 "B+ Ayarları"
+],
+"Shut down computer after this video": [
+"Apagar el equipo al terminar este vídeo",
+"Éteindre l'ordinateur après cette vidéo",
+"Desligar o computador após este vídeo",
+"Выключить компьютер после этого видео",
+"此视频结束后关闭电脑",
+"इस वीडियो के बाद कंप्यूटर बंद करें",
+"এই ভিডিওর পর কম্পিউটার বন্ধ করুন",
+"اس ویڈیو کے بعد کمپیوٹر بند کریں",
+"Matikan komputer setelah video ini",
+"Bu videodan sonra bilgisayarı kapat"
+],
+"Shutdown after this video: on": [
+"Apagado tras este vídeo: activado",
+"Arrêt après cette vidéo : activé",
+"Desligamento após este vídeo: ativado",
+"Выключение после видео: вкл.",
+"视频结束后关机：开",
+"इस वीडियो के बाद बंद: चालू",
+"এই ভিডিওর পর বন্ধ: চালু",
+"اس ویڈیو کے بعد بند: آن",
+"Matikan setelah video: aktif",
+"Video sonrası kapatma: açık"
+],
+"Shutdown after this video: off": [
+"Apagado tras este vídeo: desactivado",
+"Arrêt après cette vidéo : désactivé",
+"Desligamento após este vídeo: desativado",
+"Выключение после видео: выкл.",
+"视频结束后关机：关",
+"इस वीडियो के बाद बंद: बंद",
+"এই ভিডিওর পর বন্ধ: বন্ধ",
+"اس ویڈیو کے بعد بند: آف",
+"Matikan setelah video: nonaktif",
+"Video sonrası kapatma: kapalı"
+],
+"Shutting down the computer in": [
+"El equipo se apagará en",
+"L'ordinateur s'éteindra dans",
+"O computador será desligado em",
+"Компьютер выключится через",
+"电脑将在以下时间后关闭",
+"कंप्यूटर बंद होगा",
+"কম্পিউটার বন্ধ হবে",
+"کمپیوٹر بند ہوگا",
+"Komputer akan dimatikan dalam",
+"Bilgisayar şu süre sonra kapanacak"
 ]
 };
