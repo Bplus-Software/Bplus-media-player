@@ -1,0 +1,7 @@
+B+ Media Player uses unmodified AndroidX Media3 1.11.1 libraries.
+Copyright The Android Open Source Project.
+Licensed under the Apache License, Version 2.0.
+Official source: https://github.com/androidx/media
+
+AndroidX, Guava and annotations are used under their respective Apache 2.0-compatible licenses. Kotlin standard library is Apache 2.0. Cairo fonts are under the SIL Open Font License 1.1, included separately.
+No native FFmpeg or LibVLC decoder binaries are included in this build.
