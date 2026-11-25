@@ -36,9 +36,16 @@ ipcMain.handle('launch:export',async()=>{
 let uiLang='ar';
 ipcMain.on('ui:language',(e,l)=>{uiLang=l==='en'?'en':'ar';});
 /* ---------- Update feature: checks public GitHub Releases, no token ---------- */
-const UPD_REPO='basem-sadoun/Bplus-media-player';
+/* Org repo first; the old owner path stays as a fallback (GitHub redirects it after a transfer). */
+const UPD_REPOS=['Bplus-Software/Bplus-media-player','basem-sadoun/Bplus-media-player'];
+let UPD_REPO=UPD_REPOS[0];
 function cmpVer(a,b){const p=s=>String(s||'').replace(/^v/i,'').split('.').map(n=>parseInt(n,10)||0);const x=p(a),y=p(b);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]-y[i]}return 0}
 async function fetchLatestRelease(pre){
+ let last={status:'error',message:'no repository'};
+ for(const repo of UPD_REPOS){UPD_REPO=repo;try{last=await fetchLatestReleaseOne(pre)}catch(e){last={status:'error',message:String(e&&e.message||e)}}if(last.status==='ok')return last;}
+ return last;
+}
+async function fetchLatestReleaseOne(pre){
  const ua={'User-Agent':'Bplus-Player'};
  // Chromium stack first (system proxy + cert store); if the session blocks it, fall back to Node's own fetch.
  const nf=()=>async(url,opt)=>{try{return await require('electron').net.fetch(url,opt)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(url,opt);throw e}};
