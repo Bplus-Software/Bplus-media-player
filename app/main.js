@@ -51,7 +51,7 @@ async function fetchLatestReleaseOne(pre){
  const nf=()=>async(url,opt)=>{try{return await require('electron').net.fetch(url,opt)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(url,opt);throw e}};
  const T=()=>AbortSignal.timeout(15000);
  const synth=(tag)=>{const ver=String(tag).replace(/^v/i,'');
-  return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+tag+'/Bplus-'+ver+'-Setup.exe',size:0}};};
+  return{status:'ok',version:ver,name:'B+ '+ver,notes:'',asset:{name:'Bplus-Media-Player-'+ver+'-Setup.exe',url:'https://github.com/'+UPD_REPO+'/releases/download/'+tag+'/Bplus-Media-Player-'+ver+'-Setup.exe',size:0}};};
  // Electron's net.fetch uses the Chromium network stack: the Windows system
  // proxy and the Windows certificate store apply automatically.
  // 0) Preview versions wanted: newest non-draft release (prereleases included) that carries an .exe.
