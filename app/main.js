@@ -101,6 +101,7 @@ ipcMain.handle('update:check',async(e,pre)=>{
  }catch(e){return{status:'error',message:String(e&&e.message||e)}}
 });
 let updDownloading=false;
+let updState={phase:'idle',received:0,total:0,version:'',path:'',ctl:null};
 async function downloadUpdate(info){
  if(updDownloading)return{status:'busy'};
  updDownloading=true;
@@ -110,17 +111,33 @@ async function downloadUpdate(info){
   const nfetch=async(u,o)=>{try{return await require('electron').net.fetch(u,o)}catch(e){if(typeof fetch==='function'&&/BLOCKED|ERR_/i.test(String(e&&e.message||e)))return await fetch(u,o);throw e}};
   const dest=path.join(app.getPath('temp'),info.asset.name);
   log('start '+info.asset.url);
-  const res=await require('./updater-dl').downloadResumable({fetchFn:nfetch,url:info.asset.url,dest,expectedSize:info.asset.size||0,headers:{'User-Agent':'Bplus-Player'},onProgress:p=>send('update:progress',p),onLog:log});
+  updState={phase:'downloading',received:0,total:info.asset.size||0,version:info.version||'',path:'',ctl:new AbortController()};
+  const res=await require('./updater-dl').downloadResumable({fetchFn:nfetch,url:info.asset.url,dest,expectedSize:info.asset.size||0,headers:{'User-Agent':'Bplus-Player'},cancelSignal:updState.ctl.signal,onProgress:p=>{updState.received=p.received;updState.total=p.total||updState.total;send('update:progress',p)},onLog:log});
   log('done '+res.size+' bytes');
   updDownloading=false;
+  updState={phase:'ready',received:res.size,total:res.size,version:info.version||'',path:dest,ctl:null};
   return{status:'done',path:dest};
- }catch(err){updDownloading=false;const msg=String(err&&err.message||err);log('FAILED '+msg);return{status:'error',message:msg,logPath:lp}}
+ }catch(err){updDownloading=false;const msg=String(err&&err.message||err);updState={phase:'idle',received:0,total:0,version:'',path:'',ctl:null};if(msg==='CANCELED'){log('canceled by user (partial file kept for resume)');return{status:'canceled'}}log('FAILED '+msg);return{status:'error',message:msg,logPath:lp}}
 }
 ipcMain.handle('update:download',async(e,info)=>downloadUpdate(info));
 ipcMain.handle('update:open-page',()=>shell.openExternal('https://github.com/'+UPD_REPO+'/releases/latest'));
-ipcMain.handle('update:install',async(e,setupPath)=>{
- try{const{spawn}=require('child_process');const c=spawn(setupPath,[],{detached:true,stdio:'ignore'});c.unref();app.quit();return true}catch(err){return false}
-});
+ipcMain.handle('update:cancel',()=>{if(updState.ctl){updState.ctl.abort();return true}return false});
+ipcMain.handle('update:state',()=>({phase:updState.phase,received:updState.received,total:updState.total,version:updState.version,path:updState.path}));
+// Starts the installer and closes B+. If something is playing, asks first; 'later' keeps the downloaded installer ready.
+async function finishInstall(setupPath){
+ const en=uiLang==='en';
+ let playing=false;
+ try{playing=!!(win&&!win.isDestroyed()&&await win.webContents.executeJavaScript("(()=>{const v=document.getElementById('player');return !!(v&&v.currentSrc&&!v.paused&&!v.ended)})()"))}catch(e){}
+ if(playing){
+  const r=await dialog.showMessageBox(win,{type:'question',title:'B+',noLink:true,
+   message:en?'Install now and close B+?':'تثبيت الآن وإغلاق B+؟',
+   detail:en?'A file is playing. B+ will close and the update will install. You can also install later from Settings > Updates.':'يوجد ملف قيد التشغيل. سيُغلق B+ ويبدأ تثبيت التحديث. ويمكنك التثبيت لاحقًا من الإعدادات > التحديثات.',
+   buttons:en?['Install now and close B+','Later']:['تثبيت الآن وإغلاق B+','لاحقًا'],defaultId:1,cancelId:1});
+  if(r.response!==0)return 'later';
+ }
+ try{const{spawn}=require('child_process');const c=spawn(setupPath,[],{detached:true,stdio:'ignore'});c.unref();app.quit();return 'started'}catch(err){return 'error'}
+}
+ipcMain.handle('update:install',async(e,setupPath)=>finishInstall(setupPath));
 ipcMain.handle('update:prompt',async(e,info)=>{
  const en=uiLang==='en';
  const r=await dialog.showMessageBox(win,{type:'info',title:'B+',noLink:true,
@@ -129,7 +146,8 @@ ipcMain.handle('update:prompt',async(e,info)=>{
   buttons:en?['Download and install','Later']:['تنزيل وتثبيت','لاحقًا'],defaultId:0,cancelId:1});
  if(r.response!==0)return false;
  const d=await downloadUpdate(info);
- if(d.status==='done'){const{spawn}=require('child_process');const c=spawn(d.path,[],{detached:true,stdio:'ignore'});c.unref();app.quit();return true}
+ if(d.status==='done'){return (await finishInstall(d.path))==='started'}
+ if(d.status==='canceled'||d.status==='busy')return false;
  await dialog.showMessageBox(win,{type:'error',title:'B+',noLink:true,message:en?'Download failed. Check your internet connection and try again.':'فشل التنزيل. تحقق من اتصال الإنترنت وحاول مجددًا.'});
  return false;
 });

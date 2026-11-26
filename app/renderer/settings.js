@@ -166,17 +166,27 @@
    let status=document.createElement('p');status.className='settings-info';status.id='upd-status';
    let prog=document.createElement('div');prog.className='upd-progress';prog.id='upd-progress';prog.hidden=true;prog.append(document.createElement('i'));
    let dlBtn=null;let errBox=null;
+   const cancelBtn=document.createElement('button');cancelBtn.className='settings-action';cancelBtn.id='upd-cancel';cancelBtn.hidden=true;cancelBtn.textContent=en?'Cancel download':'إلغاء التنزيل';
+   cancelBtn.onclick=async()=>{cancelBtn.disabled=true;let ok=false;try{ok=await window.bplus.updateCancel()}catch(e){}cancelBtn.disabled=false;if(ok){cancelBtn.hidden=true;prog.hidden=true;status.textContent=en?'Download canceled. The part already downloaded is kept, so starting again continues from there.':'تم إلغاء التنزيل. الجزء الذي نُزّل محفوظ، فالبدء من جديد يكمل من حيث توقف.';if(dlBtn){dlBtn.disabled=false;dlBtn.textContent=en?'Download and install':'تنزيل وتثبيت'}}};
+   const instBtn=document.createElement('button');instBtn.className='settings-action';instBtn.id='upd-install';instBtn.hidden=true;instBtn.textContent=en?'Install now':'تثبيت الآن';
+   instBtn.onclick=async()=>{instBtn.disabled=true;let r;try{r=await window.bplus.updateInstall(instBtn.dataset.path)}catch(e){r='error'}instBtn.disabled=false;if(r==='error')status.textContent=en?'Could not start the installer.':'تعذر تشغيل المثبّت.'};
+   window.bplus.updateState().then(s=>{if(!s||document.getElementById('upd-status')!==status)return;if(s.phase==='downloading'){const pct=s.total?Math.min(100,Math.round(s.received/s.total*100)):0;prog.hidden=false;prog.firstElementChild.style.width=pct+'%';status.textContent=(en?'Downloading... ':'جارٍ التنزيل... ')+pct+'%';cancelBtn.hidden=false;checkBtn.disabled=true}else if(s.phase==='ready'){status.textContent=(en?'Update downloaded: B+ ':'تم تنزيل التحديث: B+ ')+s.version;instBtn.dataset.path=s.path;instBtn.hidden=false}}).catch(()=>{});
    checkBtn.onclick=async()=>{checkBtn.disabled=true;status.textContent=en?'Checking for updates...':'جارٍ التحقق من التحديثات...';
     let r;try{r=await window.bplus.updateCheck(!!prefs.updatePre)}catch(e){r=null}checkBtn.disabled=false;
     if(dlBtn){dlBtn.remove();dlBtn=null}
     if(errBox){errBox.remove();errBox=null}
     if(r&&r.status==='available'){status.textContent=(en?'A new version is available: B+ ':'يتوفر إصدار جديد: B+ ')+r.version;
      dlBtn=document.createElement('button');dlBtn.className='settings-action';dlBtn.id='upd-download';dlBtn.textContent=en?'Download and install':'تنزيل وتثبيت';
-     dlBtn.onclick=async()=>{dlBtn.disabled=true;prog.hidden=false;prog.firstElementChild.style.width='0%';
+     dlBtn.onclick=async()=>{dlBtn.disabled=true;prog.hidden=false;prog.firstElementChild.style.width='0%';cancelBtn.hidden=false;
       if(errBox){errBox.remove();errBox=null}
       status.textContent=en?'Downloading... 0%':'جارٍ التنزيل... 0%';
       let d;try{d=await window.bplus.updateDownload(r)}catch(e){d={status:'error',message:String(e&&e.message||e)}}
-      if(d&&d.status==='done'){status.textContent=en?'Download complete. The app will restart to install.':'اكتمل التنزيل. سيعاد تشغيل البرنامج للتثبيت.';await window.bplus.updateInstall(d.path);}
+      cancelBtn.hidden=true;
+      if(d&&d.status==='done'){status.textContent=en?'Download complete. The app will restart to install.':'اكتمل التنزيل. سيعاد تشغيل البرنامج للتثبيت.';let ir;try{ir=await window.bplus.updateInstall(d.path)}catch(e){ir='error'}
+       if(ir==='later'){status.textContent=en?'Update downloaded. Press "Install now" when you are ready.':'تم تنزيل التحديث. اضغط "تثبيت الآن" عندما تكون جاهزًا.';instBtn.dataset.path=d.path;instBtn.hidden=false;prog.hidden=true;dlBtn.hidden=true}
+       else if(ir==='error'){status.textContent=en?'Downloaded, but the installer could not start.':'تم التنزيل لكن تعذر تشغيل المثبّت.';instBtn.dataset.path=d.path;instBtn.hidden=false}}
+      else if(d&&d.status==='canceled'){prog.hidden=true;dlBtn.disabled=false;dlBtn.textContent=en?'Download and install':'تنزيل وتثبيت';status.textContent=en?'Download canceled. The part already downloaded is kept, so starting again continues from there.':'تم إلغاء التنزيل. الجزء الذي نُزّل محفوظ، فالبدء من جديد يكمل من حيث توقف.'}
+      else if(d&&d.status==='busy'){status.textContent=en?'A download is already running. Its progress shows here.':'يوجد تنزيل قيد التشغيل بالفعل. يظهر تقدمه هنا.';prog.hidden=false;cancelBtn.hidden=false}
       else{status.textContent=(en?'Download failed. ':'فشل التنزيل. ')+(d&&d.message?String(d.message):'')+' '+(en?'Press the button to resume where it stopped.':'اضغط الزر للاستكمال من حيث توقف.');dlBtn.textContent=en?'Resume download':'استكمال التنزيل';dlBtn.disabled=false;prog.hidden=true;
        errBox=document.createElement('div');
        let pg=document.createElement('button');pg.className='settings-action';pg.textContent=en?'Open releases page':'فتح صفحة التحديثات';pg.onclick=()=>window.bplus.updateOpenPage();
@@ -194,11 +204,11 @@
      errBox.append(pg,cp);
      if(r&&r.logPath){let lp=document.createElement('p');lp.className='settings-info';lp.textContent=(en?'Details saved to: ':'سُجلت التفاصيل في: ')+r.logPath;errBox.append(lp);}
      content.append(errBox);}};
-   content.append(cur,checkBtn,status,prog);
+   content.append(cur,checkBtn,status,prog,cancelBtn,instBtn);
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.18');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.19');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}

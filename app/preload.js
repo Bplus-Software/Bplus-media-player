@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('bplus', {
   updateCheck:(pre)=>ipcRenderer.invoke('update:check',!!pre),
   updateDownload:(info)=>ipcRenderer.invoke('update:download',info),
   updateInstall:(p)=>ipcRenderer.invoke('update:install',p),
+  updateCancel:()=>ipcRenderer.invoke('update:cancel'),
+  updateState:()=>ipcRenderer.invoke('update:state'),
   updatePrompt:(info)=>ipcRenderer.invoke('update:prompt',info),
   updateOpenPage:()=>ipcRenderer.invoke('update:open-page'),
   onUpdateProgress:(cb)=>ipcRenderer.on('update:progress',(e,p)=>cb(p)),

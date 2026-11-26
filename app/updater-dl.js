@@ -5,16 +5,19 @@
 // and resumed instead of hanging forever.
 const fs = require('fs');
 
-async function downloadResumable({ fetchFn, url, dest, expectedSize = 0, onProgress = () => {}, onLog = () => {}, maxAttempts = 8, stallMs = 30000, headers = {} }) {
+async function downloadResumable({ fetchFn, url, dest, expectedSize = 0, onProgress = () => {}, onLog = () => {}, maxAttempts = 8, stallMs = 30000, headers = {}, cancelSignal = null }) {
   const part = dest + '.part';
   let total = expectedSize || 0;
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (cancelSignal && cancelSignal.aborted) throw new Error('CANCELED');
     let have = 0;
     try { have = fs.statSync(part).size; } catch (e) { have = 0; }
     if (total && have > total) { try { fs.unlinkSync(part); } catch (e) {} have = 0; }
     if (total && have === total) break;
     const ac = new AbortController();
+    const onCancel = () => ac.abort(new Error('CANCELED'));
+    if (cancelSignal) cancelSignal.addEventListener('abort', onCancel, { once: true });
     let timer = null;
     const arm = () => { clearTimeout(timer); timer = setTimeout(() => ac.abort(new Error('stalled: no data for ' + Math.round(stallMs / 1000) + 's')), stallMs); };
     try {
@@ -46,9 +49,12 @@ async function downloadResumable({ fetchFn, url, dest, expectedSize = 0, onProgr
       }
       if (total && received < total) throw new Error('connection closed early at ' + received + ' of ' + total + ' bytes');
       lastErr = null;
+      if (cancelSignal) cancelSignal.removeEventListener('abort', onCancel);
       break;
     } catch (e) {
       clearTimeout(timer);
+      if (cancelSignal) cancelSignal.removeEventListener('abort', onCancel);
+      if (cancelSignal && cancelSignal.aborted) throw new Error('CANCELED');
       lastErr = (ac.signal.aborted && ac.signal.reason ? ac.signal.reason : e);
       onLog('attempt ' + attempt + '/' + maxAttempts + ' failed: ' + String(lastErr && lastErr.message || lastErr));
       await new Promise(res => setTimeout(res, Math.min(4000, 400 * attempt)));
