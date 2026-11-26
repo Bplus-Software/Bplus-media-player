@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('bplus', {
   rendererReady: () => ipcRenderer.send('renderer:ready'),
   onExternalMedia: (cb) => ipcRenderer.on('media:external', (e, entries) => cb(entries)),
   entriesForPaths: (paths) => ipcRenderer.invoke('media:entries', paths),
-  siblingEntries: (p) => ipcRenderer.invoke('media:siblings', p),
+  siblingEntries: (p, mode) => ipcRenderer.invoke('media:siblings', p, mode),
   shutdown: () => ipcRenderer.invoke('system:shutdown'),
   openDefaults: () => ipcRenderer.invoke('system:defaults'),
   systemInfo: () => ipcRenderer.invoke('system:info'),

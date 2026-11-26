@@ -203,13 +203,19 @@ ipcMain.handle('media:clear-cache',()=>engine.clear());
 ipcMain.handle('media:open', openMedia);
 ipcMain.handle('media:entries', (e, paths) => paths.map(mediaEntry));
 // Same-format siblings of an opened file, natural-sorted. Read-only directory listing.
-ipcMain.handle('media:siblings', (e, p) => {
+ipcMain.handle('media:siblings', (e, p, mode) => {
   try {
     const dir = path.dirname(p);
     const ext = path.extname(p).toLowerCase();
     if (!ext) return [mediaEntry(p)];
+    // series: same name once digit runs are ignored (Show S01E02 matches Show S01E03); ext: same extension; all: any media file
+    const shape = (f) => path.basename(f, path.extname(f)).toLowerCase().replace(/\d+/g, '#');
+    const mine = shape(p);
+    const keep = mode === 'all' ? (n) => MEDIA_EXTS.includes(path.extname(n).toLowerCase())
+      : mode === 'series' ? (n) => path.extname(n).toLowerCase() === ext && shape(n) === mine
+      : (n) => path.extname(n).toLowerCase() === ext;
     return fs.readdirSync(dir, { withFileTypes: true })
-      .filter(d => d.isFile() && path.extname(d.name).toLowerCase() === ext)
+      .filter(d => d.isFile() && keep(d.name))
       .map(d => d.name)
       .sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }))
       .map(f => mediaEntry(path.join(dir, f)));

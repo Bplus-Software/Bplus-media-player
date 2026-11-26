@@ -90,9 +90,10 @@ function renderPlaylist() {
 
 /* Same-format sibling expansion (Settings > Playback). */
 async function expandSiblings(entries) {
-  if (!window.bplusPrefs || !window.bplusPrefs.addSiblings || entries.length !== 1) return null;
+  const mode = window.bplusPrefs && (window.bplusPrefs.siblings || (window.bplusPrefs.addSiblings ? 'ext' : 'off'));
+  if (!mode || mode === 'off' || entries.length !== 1) return null;
   try {
-    const sibs = await window.bplus.siblingEntries(entries[0].path);
+    const sibs = await window.bplus.siblingEntries(entries[0].path, mode);
     if (!Array.isArray(sibs) || sibs.length < 2) return null;
     const idx = sibs.findIndex(x => x.path === entries[0].path);
     return { entries: sibs, index: idx < 0 ? 0 : idx };
@@ -867,6 +868,11 @@ bSubVis.addEventListener('contextmenu', (e) => {
     popItem(c, L('فتح ملف ترجمة...', 'Open subtitle...'), null, () => window.bplus.openSubtitleDialog(), { icon: 'm-sub' });
     popItem(c, L('البحث عن ترجمة', 'Search for subtitle'), null, searchSubtitle, { icon: 'm-text' });
   });
+  // sit directly on the top edge of the control bar, no gap, right edge lined up with the other bottom panels
+  const cb = $('controls').getBoundingClientRect(), a = $('b-av').getBoundingClientRect(), w = ctxMenu.offsetWidth, h = ctxMenu.offsetHeight;
+  ctxMenu.style.top = Math.max(4, cb.top - h) + 'px';
+  ctxMenu.style.left = Math.max(4, Math.min(innerWidth - w - 4, a.right - w)) + 'px';
+  { const bb = bSubVis.getBoundingClientRect(), L0 = parseFloat(ctxMenu.style.left); ctxMenu.style.setProperty('--ax', Math.max(14, Math.min(w - 14, bb.left + bb.width / 2 - L0)) + 'px'); ctxMenu.classList.add('ptr'); }
 });
 async function searchSubtitle() {
   const item = playlist[current];
@@ -987,7 +993,7 @@ function popHead(container, text) {
 
 function showPop(container, anchor, buildFn) {
   hidePops();
-  container.innerHTML = '';
+  container.innerHTML = ''; container.classList.remove('ptr');
   container.dir = document.documentElement.dir === 'ltr' ? 'ltr' : 'rtl';
   buildFn(container);
   container.hidden = false;
