@@ -106,7 +106,7 @@ async function addWithSiblings(entries) {
   const base = playlist.length;
   playlist.push(...ex.entries);
   renderPlaylist();
-  showOsd((window.bplusPrefs.language === 'ar' ? 'أُضيفت ملفات المجلد: ' : 'Folder files added: ') + ex.entries.length);
+  showOsd((window.bplusPrefs.language === 'ar' ? 'أُضيف إلى قائمة التشغيل من المجلد: ' : 'Added to the playlist from the folder: ') + ex.entries.length);
   playAt(base + ex.index);
 }
 
@@ -115,7 +115,7 @@ function addEntries(entries) {
   playlist.push(...entries);
   renderPlaylist();
   if (wasEmpty && playlist.length) playAt(0);
-  else if (entries.length) showOsd(L('أُضيف ', 'Added ') + iso(String(entries.length)) + L(' ملف', ' file(s)'));
+  else if (entries.length) { const n = entries.length; showOsd(window.bplusPrefs && window.bplusPrefs.language === 'en' ? (n === 1 ? 'Added 1 file to the playlist' : 'Added ' + n + ' files to the playlist') : (n === 1 ? 'أُضيف ملف واحد إلى قائمة التشغيل' : n === 2 ? 'أُضيف ملفان إلى قائمة التشغيل' : n <= 10 ? 'أُضيفت ' + iso(String(n)) + ' ملفات إلى قائمة التشغيل' : 'أُضيف ' + iso(String(n)) + ' ملفًا إلى قائمة التشغيل')); }
 }
 
 function removeAt(i) {
@@ -656,8 +656,11 @@ function syncRepeatShuffleUI() {
   $('pl-shuffle').classList.toggle('on', shuffleOn);
   $('pl-shuffle').title = shuffleOn ? L('عشوائي: يعمل', 'Shuffle: on') : L('تشغيل عشوائي', 'Shuffle');
   player.loop = repeatMode === 'one';
+  mirrorLoopPref();
 }
 window.bplusSetLoop = (on) => { repeatMode = on ? 'one' : 'off'; localStorage.setItem('bplus-repeat', repeatMode); syncRepeatShuffleUI(); };
+/* The panel button is the single source: mirror it into the Settings pref without re-applying. */
+function mirrorLoopPref() { const p = window.bplusPrefs; if (!p) return; const on = repeatMode === 'one'; if (p.loop !== on) { p.loop = on; window.__ll = on; try { localStorage.setItem('bplus-prefs', JSON.stringify(p)); } catch (_) {} } }
 function nextIndex() {
   if (shuffleOn && playlist.length > 1) {
     let i = current;
@@ -828,6 +831,7 @@ seek.addEventListener('change', () => {
   seeking = false;
 });
 
+function saveVol() { try { localStorage.setItem('bplus-vol', String(vol.value)); localStorage.setItem('bplus-muted', player.muted ? '1' : '0'); } catch (_) {} }
 function updateVolUI() {
   volFill.style.width = (vol.value / 2) + '%';
   volNum.textContent = vol.value;
@@ -842,6 +846,7 @@ vol.addEventListener('input', () => {
   player.volume = Math.min(v, 100) / 100;
   player.muted = v === 0;
   window.bplusVolumeBoost = v > 100 ? v / 100 : 1;
+  saveVol();
   if (window.BPLUS_SETTINGS) { if (v > 100) window.BPLUS_SETTINGS.audio(); if (window.BPLUS_SETTINGS.applyAudio) window.BPLUS_SETTINGS.applyAudio(); }
   updateVolUI();
 });
@@ -856,7 +861,7 @@ $('video-wrap').addEventListener('wheel', (e) => {
   vol.dispatchEvent(new Event('input'));
 }, { passive: false });
 
-bMute.onclick = () => { player.muted = !player.muted; updateVolUI(); };
+bMute.onclick = () => { player.muted = !player.muted; saveVol(); updateVolUI(); };
 bPlay.onclick = togglePlay;
 bigPlay.onclick = togglePlay;
 $('b-next').onclick = next;
@@ -1144,7 +1149,7 @@ window.bplus.onMenuAction((a) => {
 });
 window.bplus.onSnapshotSaved((name) => showOsd(name ? L('حُفظت اللقطة: ', 'Snapshot saved: ') + iso(name) : L('أُلغي الحفظ', 'Save canceled')));
 
-player.volume = 0.8;
+(() => { let v = parseInt(localStorage.getItem('bplus-vol'), 10); if (!(v >= 0 && v <= 200)) v = 80; vol.value = v; player.volume = Math.min(v, 100) / 100; window.bplusVolumeBoost = v > 100 ? v / 100 : 1; player.muted = localStorage.getItem('bplus-muted') === '1' || v === 0; if (v > 100) player.addEventListener('play', () => { if (window.BPLUS_SETTINGS) { window.BPLUS_SETTINGS.audio(); if (window.BPLUS_SETTINGS.applyAudio) window.BPLUS_SETTINGS.applyAudio(); } }, { once: true }); })();
 updateVolUI();
 renderPlaylist();
 
@@ -1305,7 +1310,7 @@ async function libNameFree(name, exceptId) {
   return true;
 }
 async function libNew(items) {
-  const name = await libAsk(L('اسم القائمة الجديدة', 'New list name'), '');
+  const name = await libAsk(L('اسم المكتبة الجديدة', 'New library name'), '');
   if (!name || !(await libNameFree(name))) return;
   libs.push({ id: 'l' + Date.now().toString(36), name, items: items || [] }); libSave();
   showOsd(L('تم حفظ المكتبة: ', 'Library saved: ') + name);
@@ -1346,11 +1351,11 @@ async function libDelete(lib) {
 function libActions(lib, rect) {
   showPop(ctxMenu, { getBoundingClientRect: () => rect }, (c) => {
     popHead(c, lib.name + '  (' + lib.items.length + ')');
-    popItem(c, L('فتح (يستبدل قائمة التشغيل)', 'Open (replaces playlist)'), null, () => libOpen(lib, true), { icon: 'm-list' });
-    popItem(c, L('إضافة إلى قائمة التشغيل', 'Add to current playlist'), null, () => libOpen(lib, false), { icon: 'plus' });
+    popItem(c, L('تشغيل المكتبة (تستبدل القائمة الحالية)', 'Play library (replaces current playlist)'), null, () => libOpen(lib, true), { icon: 'm-list' });
+    popItem(c, L('إضافة إلى قائمة التشغيل الحالية', 'Add to current playlist'), null, () => libOpen(lib, false), { icon: 'plus' });
     popSep(c);
-    popItem(c, L('إضافة ملفات...', 'Add files...'), null, () => libAddPick(lib, 'files'), { icon: 'm-file' });
-    popItem(c, L('إضافة مجلد...', 'Add folder...'), null, () => libAddPick(lib, 'folder'), { icon: 'm-folder' });
+    popItem(c, L('إضافة ملفات إلى المكتبة...', 'Add files to library...'), null, () => libAddPick(lib, 'files'), { icon: 'm-file' });
+    popItem(c, L('إضافة مجلد إلى المكتبة...', 'Add folder to library...'), null, () => libAddPick(lib, 'folder'), { icon: 'm-folder' });
     popItem(c, L('إعادة تسمية...', 'Rename...'), null, async () => {
       const n = await libAsk(L('اسم المكتبة', 'Library name'), lib.name);
       if (n && await libNameFree(n, lib.id)) { lib.name = n; libSave(); }
@@ -1378,7 +1383,70 @@ function libFill(box) {
     if (!playlist.length) { showOsd(L('قائمة التشغيل فارغة', 'The playlist is empty')); return; }
     libNew(playlist.map(libSlim));
   }, { icon: 'm-file' });
-  popItem(box, L('إضافة قائمة جديدة', 'Add new list'), null, () => libNew([]), { icon: 'plus' });
+  popItem(box, L('مكتبة جديدة...', 'New library...'), null, () => libNew([]), { icon: 'plus' });
 }
 $('pl-lib').title = L('المكتبات', 'Libraries');
 $('pl-lib').onclick = (ev) => { ev.stopPropagation(); showPop(menuPop, $('pl-lib'), libFill); };
+
+/* ---------- 1.0.17: A-B repeat, frame step, number-key seek, media keys, taskbar progress ---------- */
+(() => {
+  let abA = null, abB = null, abTimer = 0;
+  const en = () => window.bplusPrefs && window.bplusPrefs.language === 'en';
+  const fmt = (t) => { t = Math.max(0, Math.floor(t)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'); };
+  function abClear() { abA = abB = null; clearInterval(abTimer); abTimer = 0; }
+  function abStep() {
+    if (!isFinite(player.duration) || !player.duration) return;
+    if (abA === null) { abA = player.currentTime; showOsd(iso(L('تكرار مقطع: البداية ', 'Loop section: start ') + fmt(abA))); }
+    else if (abB === null) {
+      if (player.currentTime <= abA + 0.3) { showOsd(L('اختر نهاية بعد البداية', 'Pick an end after the start')); return; }
+      abB = player.currentTime; showOsd(iso(L('تكرار مقطع: ', 'Looping section: ') + fmt(abA) + ' - ' + fmt(abB) + L(' (اضغط A للإلغاء)', ' (press A to cancel)')));
+      abTimer = setInterval(() => { if (abB !== null && !player.paused && player.currentTime >= abB) player.currentTime = abA; }, 80);
+    } else { abClear(); showOsd(L('أُلغي تكرار المقطع', 'Section loop off')); }
+  }
+  player.addEventListener('emptied', abClear);
+  player.addEventListener('loadstart', abClear);
+  function stepFrame(dir) {
+    if (!isFinite(player.duration)) return;
+    player.pause();
+    player.currentTime = Math.min(player.duration, Math.max(0, player.currentTime + dir / 30));
+    showOsd(dir > 0 ? L('إطار للأمام', 'Next frame') : L('إطار للخلف', 'Previous frame'));
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = e.target && e.target.tagName;
+    if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return;
+    if (document.querySelector('.settings-overlay:not([hidden])')) return;
+    if (e.code === 'KeyA' && !e.shiftKey) { e.preventDefault(); abStep(); return; }
+    if (e.code === 'Period' && !e.shiftKey) { e.preventDefault(); stepFrame(1); return; }
+    if (e.code === 'Comma' && e.shiftKey) { e.preventDefault(); stepFrame(-1); return; }
+    const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
+    if (m && !e.shiftKey && isFinite(player.duration) && player.duration > 0) { e.preventDefault(); player.currentTime = player.duration * (+m[1]) / 10; showOsd(iso(String(+m[1] * 10) + '%')); }
+  });
+  /* Media keys / headset buttons / Windows media overlay */
+  if ('mediaSession' in navigator) {
+    const ms = navigator.mediaSession;
+    const set = (a, f) => { try { ms.setActionHandler(a, f); } catch (_) {} };
+    set('play', () => { if (player.paused) togglePlay(); });
+    set('pause', () => { if (!player.paused) togglePlay(); });
+    set('stop', () => { const b = document.getElementById('b-stop'); if (b) b.click(); });
+    set('previoustrack', () => prev());
+    set('nexttrack', () => next());
+    set('seekbackward', () => { player.currentTime -= (window.bplusPrefs?.seekStep || 5); });
+    set('seekforward', () => { player.currentTime += (window.bplusPrefs?.seekStep || 5); });
+    const meta = () => { try { const it = playlist[current]; ms.metadata = it ? new MediaMetadata({ title: it.name || '', artist: 'B+' }) : null; } catch (_) {} };
+    player.addEventListener('loadedmetadata', meta);
+    player.addEventListener('play', () => { ms.playbackState = 'playing'; });
+    player.addEventListener('pause', () => { ms.playbackState = 'paused'; });
+  }
+  /* Taskbar progress */
+  let lastProg = 0;
+  const prog = (force) => {
+    if (!window.bplus.setProgress) return;
+    const now = Date.now(); if (!force && now - lastProg < 800) return; lastProg = now;
+    const d = player.duration;
+    if (!isFinite(d) || !d || !player.currentSrc) { window.bplus.setProgress(-1, false); return; }
+    window.bplus.setProgress(player.currentTime / d, player.paused);
+  };
+  player.addEventListener('timeupdate', () => prog(false));
+  ['play', 'pause', 'seeked', 'emptied', 'ended'].forEach((ev) => player.addEventListener(ev, () => prog(true)));
+})();

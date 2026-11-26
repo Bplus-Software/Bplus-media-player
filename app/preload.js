@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('bplus', {
   winMin: () => ipcRenderer.send('win:min'),
   winMaxToggle: () => ipcRenderer.send('win:max-toggle'),
   winClose: () => ipcRenderer.send('win:close'),
+  setProgress: (v, paused) => ipcRenderer.send('win:progress', v, !!paused),
   onMenuAction: (cb) => ipcRenderer.on('menu:action', (e, a) => cb(a)),
   onPlaylistAdd: (cb) => ipcRenderer.on('playlist:add', (e, entries) => cb(entries)),
   onSubtitleLoad: (cb) => ipcRenderer.on('subtitle:load', (e, s) => cb(s)),

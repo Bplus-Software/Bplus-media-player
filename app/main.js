@@ -342,6 +342,7 @@ ipcMain.handle('tray:set',(e,flag)=>{trayOn=!!flag;if(!trayOn&&tray)restoreFromT
 ipcMain.on('win:min', () => win && win.minimize());
 ipcMain.on('win:max-toggle', () => { if (win) { win.isMaximized() ? win.unmaximize() : win.maximize(); } });
 ipcMain.on('win:close', () => win && win.close());
+ipcMain.on('win:progress', (e, v, paused) => { try { if (win && !win.isDestroyed()) win.setProgressBar(typeof v === 'number' && v >= 0 ? Math.min(1, v) : -1, { mode: paused ? 'paused' : 'normal' }); } catch (_) {} });
 
 ipcMain.on('test:result', (e, result) => {
   console.log('TEST_RESULT ' + JSON.stringify(result));
