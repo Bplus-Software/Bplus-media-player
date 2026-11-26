@@ -761,7 +761,7 @@ const tipTime = seekTip.querySelector('.tip-time');
 const thumbVideo = document.createElement('video');
 thumbVideo.muted = true; thumbVideo.preload = 'auto'; thumbVideo.style.display = 'none';
 document.body.append(thumbVideo);
-let tipTimer = 0, tipPending = -1, thumbSrc = '', thumbIdle = 0, thumbBusy = false, thumbQueued = -1;
+let lastThumbSeek = 0, tipTimer = 0, tipPending = -1, thumbSrc = '', thumbIdle = 0, thumbBusy = false, thumbQueued = -1;
 thumbVideo.preload = 'metadata';
 function thumbWantedSrc() { return player.videoWidth > 0 ? (player.currentSrc || player.getAttribute('src') || '') : ''; }
 function thumbAttach() {
@@ -784,7 +784,8 @@ function thumbSeekTo(t) {
   try { thumbVideo.currentTime = t; } catch (e2) { thumbBusy = false; }
 }
 seek.addEventListener('mousemove', (e) => {
-  if (!window.bplusPrefs || !window.bplusPrefs.thumbPreview || player.videoWidth === 0 || !isFinite(player.duration) || !thumbAttach()) { hideSeekTip(); return; }
+  const dragging = (e.buttons & 1) === 1;   // never decode while the thumb is being dragged
+  if (!window.bplusPrefs || !window.bplusPrefs.thumbPreview || player.videoWidth === 0 || !isFinite(player.duration) || (!dragging && !thumbAttach())) { hideSeekTip(); return; }
   const r = seek.getBoundingClientRect();
   const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
   tipPending = frac * player.duration;
@@ -793,7 +794,9 @@ seek.addEventListener('mousemove', (e) => {
   seekTip.hidden = false;
   tipTime.textContent = fmt(tipPending) + ' / ' + fmt(player.duration);
   clearTimeout(tipTimer);
-  tipTimer = setTimeout(() => thumbSeekTo(tipPending), 160);
+  if (dragging) { tipCanvas.style.visibility = 'hidden'; thumbQueued = -1; return; }
+  // decode only when the pointer rests, and at most one preview seek per 600 ms
+  tipTimer = setTimeout(() => { lastThumbSeek = Date.now(); thumbSeekTo(tipPending); }, Math.max(350, 600 - (Date.now() - lastThumbSeek)));
 });
 thumbVideo.addEventListener('seeked', () => {
   thumbBusy = false;
@@ -802,6 +805,7 @@ thumbVideo.addEventListener('seeked', () => {
   if (vw && vh) {
     const scale = Math.max(tipCanvas.width / vw, tipCanvas.height / vh);
     const dw = vw * scale, dh = vh * scale;
+    tipCanvas.style.visibility = 'visible';
     tipCtx.drawImage(thumbVideo, (tipCanvas.width - dw) / 2, (tipCanvas.height - dh) / 2, dw, dh);
   }
   if (thumbQueued >= 0) { const q = thumbQueued; thumbQueued = -1; thumbSeekTo(q); }
@@ -826,10 +830,15 @@ seek.addEventListener('input', () => {
   seekFill.style.width = pct + '%';
   seekThumb.style.left = pct + '%';
 });
-seek.addEventListener('change', () => {
+function commitSeek() {
   if (isFinite(player.duration)) player.currentTime = (seek.value / 1000) * player.duration;
   seeking = false;
-});
+}
+seek.addEventListener('change', commitSeek);
+/* If the drag ends without a 'change' (mouse released outside the window, focus lost), do not leave the bar frozen: commit and resume updating. */
+['pointerup', 'pointercancel'].forEach((ev) => window.addEventListener(ev, () => { if (seeking) commitSeek(); }, true));
+window.addEventListener('blur', () => { if (seeking) commitSeek(); });
+seek.addEventListener('blur', () => { if (seeking) commitSeek(); });
 
 function saveVol() { try { localStorage.setItem('bplus-vol', String(vol.value)); localStorage.setItem('bplus-muted', player.muted ? '1' : '0'); } catch (_) {} }
 function updateVolUI() {
@@ -1438,15 +1447,21 @@ $('pl-lib').onclick = (ev) => { ev.stopPropagation(); showPop(menuPop, $('pl-lib
     player.addEventListener('play', () => { ms.playbackState = 'playing'; });
     player.addEventListener('pause', () => { ms.playbackState = 'paused'; });
   }
-  /* Taskbar progress */
-  let lastProg = 0;
+  /* Taskbar progress: only after real playback has started, so a loading or about-to-autoplay file never shows a wrong (paused/empty) state. */
+  let lastProg = 0, started = false;
   const prog = (force) => {
     if (!window.bplus.setProgress) return;
     const now = Date.now(); if (!force && now - lastProg < 800) return; lastProg = now;
     const d = player.duration;
-    if (!isFinite(d) || !d || !player.currentSrc) { window.bplus.setProgress(-1, false); return; }
-    window.bplus.setProgress(player.currentTime / d, player.paused);
+    if (!started || !isFinite(d) || !d || !player.currentSrc || player.seeking && player.paused) { window.bplus.setProgress(-1, false); return; }
+    const f = player.currentTime / d;
+    if (!(f > 0) || f > 1 || (player.paused && f < 0.01)) { window.bplus.setProgress(-1, false); return; }  /* Windows draws a full bar for 0% in paused state */
+    window.bplus.setProgress(f, player.paused);
   };
+  const reset = () => { started = false; prog(true); };
+  player.addEventListener('emptied', reset);
+  player.addEventListener('loadstart', reset);
+  player.addEventListener('playing', () => { started = true; prog(true); });
   player.addEventListener('timeupdate', () => prog(false));
-  ['play', 'pause', 'seeked', 'emptied', 'ended'].forEach((ev) => player.addEventListener(ev, () => prog(true)));
+  ['play', 'pause', 'seeked', 'ended'].forEach((ev) => player.addEventListener(ev, () => prog(true)));
 })();
