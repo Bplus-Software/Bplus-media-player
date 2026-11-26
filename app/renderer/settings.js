@@ -5,6 +5,13 @@
  let stored={};try{stored=JSON.parse(localStorage.getItem('bplus-prefs')||'{}')||{}}catch{}
  if(stored.thumbPreview===undefined&&Object.keys(stored).length)stored.thumbPreview=true; // existing installs keep the old behavior; only new installs start with the preview off
  if(stored.siblings===undefined)stored.siblings=stored.addSiblings?'ext':'off';
+ if(!stored.fsStepsV1){ // 1.0.21: Enter = fullscreen steps, F = plain fullscreen. An older choice of Enter for plain Fullscreen would win over the steps row, so move it back to F once.
+  const others=Object.keys({...defaults,...stored}).filter(k=>k.startsWith('shortcut')&&k!=='shortcutFull'&&k!=='shortcutFsCycle');
+  const taken=key=>others.some(k=>({...defaults,...stored})[k]===key);
+  if(stored.shortcutFull==='Enter'&&!taken('f'))stored.shortcutFull='f';
+  if(stored.shortcutFsCycle===undefined||stored.shortcutFsCycle==='f'){if(!taken('Enter')&&stored.shortcutFull!=='Enter')stored.shortcutFsCycle='Enter'}
+  stored.fsStepsV1=true;
+ }
  let prefs={...defaults,...stored};
  {const I=window.BPLUS_I18N;let u=stored.uiLang;if(!I.supported(u))u=(stored.language==='ar'||stored.language==='en')?stored.language:I.fromSystem();prefs.uiLang=u;prefs.language=u==='ar'?'ar':'en'} // first run follows the Windows display language; a saved choice wins
  if(!['ar','en'].includes(prefs.language))prefs.language='ar';
@@ -208,7 +215,7 @@
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.20');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.21');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}
@@ -243,7 +250,7 @@
  const subBump=(d)=>{prefs.subDelay=Math.max(-600,Math.min(600,Math.round(((+prefs.subDelay||0)+d)*10)/10));save();syncDelay();subSaveSoon();const v=prefs.subDelay;showOsd(prefs.language==='ar'?('الترجمة '+(v>0?'متأخرة':'متقدمة')+' '+Math.abs(v).toFixed(1)+' ث'):('Subtitles '+(v>0?'later':'earlier')+' by '+Math.abs(v).toFixed(1)+'s'))};
 const rateBump=(m)=>{const v=m===0?1:Math.min(4,Math.max(0.25,Math.round(player.playbackRate*m*100)/100));player.playbackRate=v;rateIdx=RATES.reduce((b,r,i)=>Math.abs(r-v)<Math.abs(RATES[b]-v)?i:b,0);showOsd((prefs.language==='ar'?'السرعة ':'Speed ')+v+'×')};
 const actions={shortcutSlower:()=>rateBump(0.8),shortcutFaster:()=>rateBump(1.25),shortcutNormal:()=>rateBump(0),shortcutPlay:togglePlay,shortcutSubEarlier:()=>subBump(-0.5),shortcutSubLater:()=>subBump(0.5),shortcutFull:toggleFullscreen,shortcutFsCycle:cycleFullscreen,shortcutMute:()=>bMute.click(),shortcutNext:next,shortcutPrev:prev,shortcutStop:()=>$('b-stop').click(),shortcutSub:toggleSubtitleVisible,shortcutPlaylist:()=>playlistEl.classList.toggle('hidden'),shortcutSettings:()=>open(),shortcutSnapshot:takeSnapshot,shortcutSeekForward:()=>{player.currentTime=Math.min(player.duration||0,player.currentTime+(+prefs.seekStep||5));updateSeekUI()},shortcutSeekBack:()=>{player.currentTime=Math.max(0,player.currentTime-(+prefs.seekStep||5));updateSeekUI()},shortcutVolumeUp:()=>{vol.value=Math.min(200,+vol.value+5);vol.dispatchEvent(new Event('input'))},shortcutVolumeDown:()=>{vol.value=Math.max(0,+vol.value-5);vol.dispatchEvent(new Event('input'))}};
- const command=Object.keys(actions).find(k=>prefs[k]===key);if(command){e.preventDefault();e.stopImmediatePropagation();actions[command]();}
+ const command=Object.keys(actions).find(k=>prefs[k]===key);if(command){e.preventDefault();e.stopImmediatePropagation();if(e.repeat&&(command==='shortcutFsCycle'||command==='shortcutFull'))return;actions[command]();}
  },true);
  function translateChrome(){let en=prefs.language==='en';const titles={'pl-add':['إضافة ملفات','Add files'],'pl-clear':['مسح الكل','Clear all'],'pl-lib':['المكتبات','Libraries'],'tb-recent':['الملفات الحديثة','Recent files'],'b-play':['تشغيل / إيقاف','Play / pause'],'b-stop':['إيقاف','Stop'],'b-prev':['السابق','Previous'],'b-next':['التالي','Next'],'b-mute':['كتم الصوت','Mute'],'b-subvis':['إظهار/إخفاء الترجمة','Toggle subtitles'],'b-snap':['لقطة شاشة','Snapshot'],'b-speed':['سرعة التشغيل','Playback speed'],'b-set':['الإعدادات','Settings'],'b-av':['الصورة والصوت','Video & audio'],'b-pl':['قائمة التشغيل','Playlist'],'tb-menu':['القائمة','Menu'],'tb-purefs':['ملء الشاشة بدون قوائم','Clean fullscreen'],'tb-open':['فتح ملف','Open file'],'pl-sort':['ترتيب القائمة','Sort playlist'],'tb-pin':['تثبيت في المقدمة','Always on top'],'win-min':['تصغير','Minimize'],'win-max':['تكبير','Maximize'],'win-close':['إغلاق','Close']};Object.entries(titles).forEach(([id,x])=>$(id).title=x[en?1:0]);document.querySelector('.pl-title').textContent=en?'Playlist':'قائمة التشغيل';document.querySelector('.hint-sub').textContent=en?'Drop video or audio here, or press Ctrl+O':'أفلت ملفات الفيديو أو الصوت هنا، أو اضغط Ctrl+O';if(!playlist.length)plEmpty.innerHTML=en?'Playlist is empty<br><span>Add files to start</span>':'القائمة فارغة<br><span>أضف ملفات للبدء</span>';}
  // Translate menu labels at creation, retaining the original action handlers.
@@ -278,8 +285,69 @@ const actions={shortcutSlower:()=>rateBump(0.8),shortcutFaster:()=>rateBump(1.25
   let tabs=document.createElement('div');tabs.className='quick-tabs';tabs.setAttribute('role','tablist');
   [['video',ar?'الصورة':'Video'],['audio',ar?'الصوت':'Audio']].forEach(([k,label])=>{let b=document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(k===tab));if(k===tab)b.className='on';b.onclick=()=>{renderQuick(k);placeQuick()};tabs.append(b)});quick.append(tabs);
   QUICK_TABS[tab].forEach(key=>quick.append(row(key)));
-  let foot=document.createElement('footer');let reset=document.createElement('button');reset.textContent=ar?'إعادة ضبط':'Reset';reset.onclick=()=>{QUICK_TABS[tab].forEach(k=>prefs[k]=defaults[k]);save();renderQuick(tab)};foot.append(reset);quick.append(foot);
+  let foot=document.createElement('footer');let reset=document.createElement('button');reset.textContent=ar?'إعادة ضبط':'Reset';reset.onclick=()=>{QUICK_TABS[tab].forEach(k=>prefs[k]=defaults[k]);delete prefs.autoPrev;save();renderQuick(tab)};if(tab==='video'){let st=document.createElement('span');st.className='auto-note';st.id='auto-note';let ab=document.createElement('button');ab.type='button';ab.id='auto-adjust';ab.className='auto-btn';ab.textContent=ar?'ضبط تلقائي':'Auto adjust';ab.onclick=()=>autoAdjust(ab,st,ar);foot.append(st,ab)}foot.append(reset);quick.append(foot);
  }
+
+ /* ---- Auto adjust: one tap sets brightness / contrast / saturation for the current video ----
+    Samples the raw picture (no CSS filter) on a small canvas, picks the best values from the real brightness histogram within safe limits, and restores your old values when the next video loads. */
+ const AUTO_LIM={brightness:[75,150],contrast:[90,125],saturation:[90,120]};
+ function sampleFrame(){
+  const w=96,h=54,cv=document.createElement('canvas');cv.width=w;cv.height=h;const cx=cv.getContext('2d',{willReadFrequently:true});
+  cx.drawImage(player,0,0,w,h);const d=cx.getImageData(0,0,w,h).data;
+  const lum=new Float32Array(w*h);let sat=0;
+  for(let i=0,p=0;i<d.length;i+=4,p++){const r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255;lum[p]=0.2126*r+0.7152*g+0.0722*b;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);sat+=mx>0.05?(mx-mn)/mx:0}
+  // ignore black bars: rows and columns at the edges that are almost black
+  let t=0,bt=h-1,l=0,rt=w-1;const rowMax=y=>{let m=0;for(let x=0;x<w;x++)m=Math.max(m,lum[y*w+x]);return m},colMax=x=>{let m=0;for(let y=0;y<h;y++)m=Math.max(m,lum[y*w+x]);return m};
+  while(t<h-4&&rowMax(t)<0.04)t++;while(bt>t+3&&rowMax(bt)<0.04)bt--;while(l<w-4&&colMax(l)<0.04)l++;while(rt>l+3&&colMax(rt)<0.04)rt--;
+  const hist=new Float32Array(256);let n=0,sv=0;
+  for(let y=t;y<=bt;y++)for(let x=l;x<=rt;x++){const v=lum[y*w+x];hist[Math.min(255,Math.round(v*255))]++;n++}
+  return {hist,n,sat:sat/(w*h)};
+ }
+ function pct(hist,n,q){let c=0;for(let i=0;i<256;i++){c+=hist[i];if(c>=n*q)return i/255}return 1}
+ function planAuto(frames){
+  const hist=new Float32Array(256);let n=0,sat=0;frames.forEach(f=>{for(let i=0;i<256;i++)hist[i]+=f.hist[i];n+=f.n;sat+=f.sat});sat/=frames.length;
+  if(n<50)return null;
+  const med=pct(hist,n,0.5),p5=pct(hist,n,0.05),p95=pct(hist,n,0.95),spread=p95-p5;
+  if(p95<0.04)return {black:true};
+  const good=med>=0.36&&med<=0.54&&spread>=0.55&&p95<=0.97&&p5>=0.02;
+  // try every allowed brightness/contrast pair on the histogram and keep the one closest to a well-exposed picture
+  let best={cost:1e9,b:100,c:100};
+  for(let b=AUTO_LIM.brightness[0];b<=AUTO_LIM.brightness[1];b+=5)for(let c=AUTO_LIM.contrast[0];c<=AUTO_LIM.contrast[1];c+=5){
+   const map=v=>Math.min(1,Math.max(0,(v*b/100-0.5)*c/100+0.5));
+   const m2=map(med),sp=map(p95)-map(p5);let clipHi=0,clipLo=0;for(let i=0;i<256;i++){const o=map(i/255);if(o>=0.99)clipHi+=hist[i];if(o<=0.01)clipLo+=hist[i]}
+   const base=(()=>{let ch=0,cl=0;for(let i=0;i<256;i++){if(i/255>=0.99)ch+=hist[i];if(i/255<=0.01)cl+=hist[i]}return [ch/n,cl/n]})();
+   const extraClip=Math.max(0,clipHi/n-Math.max(base[0],0.01))+Math.max(0,clipLo/n-Math.max(base[1],0.01));
+   const cost=Math.pow(m2-0.45,2)*4+Math.pow(Math.min(sp,0.8)-0.72,2)*(sp<0.72?1:0)+extraClip*6+(Math.abs(b-100)+Math.abs(c-100))/4000;
+   if(cost<best.cost)best={cost,b,c};
+  }
+  const s=sat<0.15?115:sat<0.22?108:sat>0.65?92:100;
+  return {good,b:good?100:best.b,c:good?100:best.c,s:good?100:s,med,sat};
+ }
+ let autoBusy=false;
+ async function autoAdjust(btn,note,ar){
+  if(autoBusy)return;
+  const say=(a,e)=>{note.textContent=ar?a:e};
+  if(!player.videoWidth||player.readyState<2){say('لا توجد صورة لضبطها','No picture to adjust');return}
+  autoBusy=true;btn.disabled=true;say('جارٍ التحليل...','Analyzing...');
+  try{
+   // use the real, unfiltered picture: take a few frames while playing so one dark or bright shot does not decide
+   const frames=[];const count=player.paused?1:6;
+   for(let i=0;i<count;i++){frames.push(sampleFrame());if(i<count-1)await new Promise(r=>setTimeout(r,180))}
+   const plan=planAuto(frames);
+   if(!plan){say('تعذر تحليل الصورة','Could not read the picture')}
+   else if(plan.black){say('الصورة سوداء الآن، جرّب عند ظهور مشهد','The picture is black right now. Try again on a scene')}
+   else if(plan.good){say('الصورة جيدة بالفعل','Already looks good')}
+   else{
+    if(!prefs.autoPrev)prefs.autoPrev={brightness:prefs.brightness,contrast:prefs.contrast,saturation:prefs.saturation};
+    prefs.brightness=plan.b;prefs.contrast=plan.c;prefs.saturation=plan.s;save();
+    QUICK_TABS.video.forEach(k=>{const i=quick.querySelector('input[data-pref="'+k+'"]');if(i){i.value=prefs[k];const o=i.parentElement.querySelector('output');if(o)o.textContent=prefs[k]+'%'}});
+    note.textContent=ar?'تم الضبط لهذا الفيديو':'Adjusted for this video';
+   }
+  }catch(e){say('تعذر تحليل الصورة','Could not read the picture')}
+  autoBusy=false;btn.disabled=false;
+ }
+ // the auto values belong to one video: when the next one loads, put the previous values back
+ player.addEventListener('loadedmetadata',()=>{if(prefs.autoPrev){Object.assign(prefs,prefs.autoPrev);delete prefs.autoPrev;save()}});
  function placeQuick(){placePanel(quick,$('b-av'))}
  function placePanel(el,btn){const a=$('b-av').getBoundingClientRect();const w=el.offsetWidth,h=el.offsetHeight;el.style.left=Math.max(8,Math.min(a.right-w,innerWidth-w-8))+'px';{const bb=(btn||$('b-av')).getBoundingClientRect(),L=parseFloat(el.style.left);el.style.setProperty('--ax',Math.max(14,Math.min(w-14,bb.left+bb.width/2-L))+'px');el.classList.add('ptr')}const c=document.getElementById('controls').getBoundingClientRect();el.style.top=Math.max(8,c.top-h)+'px'}
  function openQuick(){

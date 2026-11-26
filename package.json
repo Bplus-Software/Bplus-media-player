@@ -1,6 +1,6 @@
 {
   "name": "bplus-player",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "B+ media player",
   "main": "app/main.js",
   "license": "MIT",
