@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 // Bilingual UI strings: Arabic first, English second, chosen by the saved language.
+const kh = (p, d) => { const k = (window.bplusPrefs && window.bplusPrefs[p]) || d; return k.length === 1 ? k.toUpperCase() : k; };
 const L = (ar, en) => (window.bplusPrefs && window.bplusPrefs.language === 'en') ? en : ar;
 // Bidi isolation for numbers/filenames inside Arabic text (keeps 120% as 120%).
 const iso = (s) => '\u2066' + s + '\u2069';
@@ -249,6 +250,13 @@ function togglePureFullscreen() {
     setPureFs(!pureFs);
     showOsd(pureFs ? (en ? 'Clean view: bars hidden' : 'عرض نظيف: القوائم مخفية') : (en ? 'Bars visible' : 'القوائم ظاهرة'));
   }
+}
+/* Enter cycle: window -> fullscreen -> clean fullscreen -> window */
+function cycleFullscreen() {
+  const en = window.bplusPrefs?.language === 'en';
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else if (!pureFs) { setPureFs(true); showOsd(en ? 'Clean fullscreen: move the mouse to show bars' : 'ملء الشاشة بدون قوائم: حرّك الماوس لإظهار القوائم'); }
+  else document.exitFullscreen();
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) setPureFs(false); });
 let fsHideTimer = null, fsCursorTimer = null;
@@ -1045,8 +1053,8 @@ $('tb-menu').onclick = (ev) => {
     popItem(c, L('إظهار / إخفاء الترجمة', 'Show / hide subtitles'), 'Ctrl+T', toggleSubtitleVisible, { icon: 'm-eye' });
     popSep(c);
     popItem(c, L('قائمة التشغيل', 'Playlist'), 'Ctrl+P', () => playlistEl.classList.toggle('hidden'), { icon: 'm-list' });
-    popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen, { icon: 'm-full' });
-    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen, { icon: 'm-clean' });
+    popItem(c, L('ملء الشاشة', 'Fullscreen'), kh('shortcutFsCycle','Enter'), toggleFullscreen, { icon: 'm-full' });
+    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), '\u2066' + kh('shortcutFsCycle','Enter') + ' ×2\u2069', togglePureFullscreen, { icon: 'm-clean' });
     popSep(c);
     popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open(), { icon: 'm-gear' });
     popItem(c, L('حول B+', 'About B+'), null, () => window.dispatchEvent(new Event('bplus-about')), { icon: 'm-info' });
@@ -1070,7 +1078,7 @@ $('b-set').onclick = (ev) => {
 $('video-wrap').addEventListener('contextmenu', (e) => {
   e.preventDefault();
   showPop(ctxMenu, { getBoundingClientRect: () => ({ left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY }) }, (c) => {
-    popItem(c, L('تشغيل / إيقاف مؤقت', 'Play / pause'), 'Space', togglePlay, { icon: 'm-play' });
+    popItem(c, L('تشغيل / إيقاف مؤقت', 'Play / pause'), kh('shortcutPlay','Space'), togglePlay, { icon: 'm-play' });
     popItem(c, L('التالي', 'Next'), 'PgDn', next, { icon: 'm-next' });
     popItem(c, L('السابق', 'Previous'), 'PgUp', prev, { icon: 'm-prev' });
     popSep(c);
@@ -1079,8 +1087,8 @@ $('video-wrap').addEventListener('contextmenu', (e) => {
     popItem(c, L('لقطة شاشة', 'Snapshot'), null, takeSnapshot, { icon: 'm-cam' });
     popSep(c);
     popItem(c, L('قائمة التشغيل', 'Playlist'), null, () => playlistEl.classList.toggle('hidden'), { icon: 'm-list' });
-    popItem(c, L('ملء الشاشة', 'Fullscreen'), 'F11', toggleFullscreen, { icon: 'm-full' });
-    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), 'Shift+F', togglePureFullscreen, { icon: 'm-clean' });
+    popItem(c, L('ملء الشاشة', 'Fullscreen'), kh('shortcutFsCycle','Enter'), toggleFullscreen, { icon: 'm-full' });
+    popItem(c, L('ملء الشاشة بدون قوائم', 'Clean fullscreen'), '\u2066' + kh('shortcutFsCycle','Enter') + ' ×2\u2069', togglePureFullscreen, { icon: 'm-clean' });
     popSep(c);
     popItem(c, L('الإعدادات', 'Settings'), null, () => window.BPLUS_SETTINGS && window.BPLUS_SETTINGS.open(), { icon: 'm-gear' });
   });
@@ -1465,3 +1473,10 @@ $('pl-lib').onclick = (ev) => { ev.stopPropagation(); showPop(menuPop, $('pl-lib
   player.addEventListener('timeupdate', () => prog(false));
   ['play', 'pause', 'seeked', 'ended'].forEach((ev) => player.addEventListener(ev, () => prog(true)));
 })();
+
+/* After a mouse click on a control button, give focus back to the page so Enter / Space run the configured shortcut instead of re-pressing that button. Keyboard activation (Tab then Enter) is unchanged. */
+document.addEventListener('click', (e) => {
+  if (e.detail === 0) return;
+  const b = e.target.closest && e.target.closest('#controls button, #titlebar button, #playlist button, #pl-head button');
+  if (b && b.blur) b.blur();
+});

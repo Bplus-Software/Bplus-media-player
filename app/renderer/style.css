@@ -344,7 +344,7 @@ html:fullscreen body.fs-pure.fs-cursor #video-wrap, html:fullscreen body.fs-pure
 .pl-tools { gap: 0; }
 .pl-tools button { padding-inline: 4px; }
 #title-label{pointer-events:auto}#title-label.scrolling{text-overflow:clip;text-align:start}
-#title-label{max-width:none}
+#title-label{max-width:none;top:calc(50% - 2px)}
 #quick-av,#speed-pop{box-shadow:none}
 #speed-pop input[type=range]{accent-color:var(--accent);height:4px;cursor:pointer}
 #quick-av.ptr::after,#speed-pop.ptr::after,#ctx-menu.ptr::after{content:'';position:absolute;bottom:-8px;left:calc(var(--ax) - 8px);width:14px;height:14px;background:var(--panel);border-right:1px solid var(--panel-border);border-bottom:1px solid var(--panel-border);transform:rotate(45deg);pointer-events:none}

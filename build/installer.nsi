@@ -4,16 +4,16 @@ Unicode true
 !include "StrFunc.nsh"
 ${StrStr}
 ${UnStrStr}
-Name "B+ Media Player 1.0.19"
-OutFile "../dist/Bplus-Media-Player-1.0.19-Setup.exe"
+Name "B+ Media Player 1.0.20"
+OutFile "../dist/Bplus-Media-Player-1.0.20-Setup.exe"
 InstallDir "$LOCALAPPDATA\Programs\Bplus Software\bplus media player"
 InstallDirRegKey HKCU "Software\Bplus" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID zlib
-VIProductVersion "1.0.19.0"
+VIProductVersion "1.0.20.0"
 VIAddVersionKey "ProductName" "B+ Media Player"
 VIAddVersionKey "FileDescription" "B+ per-user installer"
-VIAddVersionKey "FileVersion" "1.0.19"
+VIAddVersionKey "FileVersion" "1.0.20"
 VIAddVersionKey "LegalCopyright" "B+ contributors"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\B+.exe"
@@ -130,7 +130,7 @@ Section "B+"
  CreateShortcut "$SMPROGRAMS\B+ Media Player\B+ Media Player.lnk" "$INSTDIR\B+.exe"
  CreateShortcut "$DESKTOP\B+ Media Player.lnk" "$INSTDIR\B+.exe"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayName" "B+ Media Player"
- WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayVersion" "1.0.19"
+ WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayVersion" "1.0.20"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "UninstallString" '$\"$INSTDIR\Uninstall Bplus.exe$\"'
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "DisplayIcon" "$INSTDIR\B+.exe"
  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Bplus" "NoModify" 1
