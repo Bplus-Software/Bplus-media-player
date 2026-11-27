@@ -5,7 +5,7 @@
  let stored={};try{stored=JSON.parse(localStorage.getItem('bplus-prefs')||'{}')||{}}catch{}
  if(stored.thumbPreview===undefined&&Object.keys(stored).length)stored.thumbPreview=true; // existing installs keep the old behavior; only new installs start with the preview off
  if(stored.siblings===undefined)stored.siblings=stored.addSiblings?'ext':'off';
- if(!stored.fsStepsV1){ // 1.0.21: Enter = fullscreen steps, F = plain fullscreen. An older choice of Enter for plain Fullscreen would win over the steps row, so move it back to F once.
+ if(!stored.fsStepsV1){ // 1.0.22: Enter = fullscreen steps, F = plain fullscreen. An older choice of Enter for plain Fullscreen would win over the steps row, so move it back to F once.
   const others=Object.keys({...defaults,...stored}).filter(k=>k.startsWith('shortcut')&&k!=='shortcutFull'&&k!=='shortcutFsCycle');
   const taken=key=>others.some(k=>({...defaults,...stored})[k]===key);
   if(stored.shortcutFull==='Enter'&&!taken('f'))stored.shortcutFull='f';
@@ -215,7 +215,7 @@
    note(en?'Updates are downloaded from the official B+ page on GitHub. Your settings are kept when updating.':'تُنزَّل التحديثات من صفحة B+ الرسمية على GitHub. تُحفظ إعداداتك عند التحديث.');
   }
   if(active==='about'){content.style.textAlign='center';}else{content.style.textAlign='start';}
-  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.21');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
+  if(active==='about'){let logo=document.createElement('div');logo.className='about-logo';logo.textContent='B+';content.append(logo);note('B+ 1.0.22');note(prefs.language==='ar'?'تم تطوير البرنامج بواسطة':'Developed by');let identity=document.createElement('div');identity.className='about-identity';identity.dir='auto';identity.textContent=window.BPLUS_IDENTITY?.name||'[الاسم قيد التأكيد]';content.append(identity);note(window.BPLUS_IDENTITY?.email||'[البريد قيد التأكيد]');note(prefs.language==='ar'?'الرجاء الدعاء لوالدي (حلمي سعدون) بالرحمة والمغفرة':'Please pray for my father (Helmy Sadoun) for mercy and forgiveness');note(prefs.language==='ar'?'واجهة أصلية. بدون إعلانات أو تفعيل. مبني على Electron وChromium. محرك FFmpeg منفصل ومرفق. تحتفظ المكونات الخارجية برخصها.':'Original interface. No ads or activation. Built with Electron, Chromium and FFmpeg. Third-party licenses apply.');}
  }
  function open(section){if(document.getElementById('quick-av'))document.getElementById('quick-av').hidden=true;active=section||prefs.lastSection||'playback';prefs.lastSection=active;save();render();overlay.hidden=false;hidePops()}
  function close(){overlay.hidden=true}
